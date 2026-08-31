@@ -22,14 +22,14 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="pois/index"
+        name="pois"
         options={{
           title: 'POIs',
           tabBarIcon: ({ color }) => <Target size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="trades/index"
+        name="trades"
         options={{
           title: 'Trades',
           tabBarIcon: ({ color }) => <TrendingUp size={24} color={color} />,
@@ -43,7 +43,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="more/index"
+        name="more"
         options={{
           title: 'More',
           tabBarIcon: ({ color }) => <Menu size={24} color={color} />,

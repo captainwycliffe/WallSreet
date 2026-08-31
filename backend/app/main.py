@@ -45,6 +45,18 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Demo data seeding skipped: %s", e)
 
+    # Wire up the event bus so published events actually reach WS clients
+    from app.events.bus import event_bus
+    from app.events.handlers import register_handlers
+    register_handlers()
+    event_bus.start()
+
+    # Start the WS connection manager's Redis pub/sub listener — this was
+    # never called anywhere, so cross-worker real-time delivery was dead
+    # even with register_handlers() wired up.
+    from app.websocket.manager import ws_manager
+    await ws_manager.startup()
+
     # Start background tasks
     from app.services.ea_service import ea_service
     _ea_monitor_task = asyncio.create_task(
@@ -61,6 +73,8 @@ async def lifespan(app: FastAPI):
         await _ea_monitor_task
     except asyncio.CancelledError:
         pass
+    await event_bus.stop()
+    await ws_manager.shutdown()
     await engine.dispose()
     logger.info("Shutdown complete")
 

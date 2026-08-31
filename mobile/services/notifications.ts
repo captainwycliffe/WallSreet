@@ -1,15 +1,20 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+// Prevent auto-import crash in Expo Go by requiring dynamically
+let Notifications: typeof import('expo-notifications') | null = null;
+if (!isExpoGo) {
+  Notifications = require('expo-notifications');
+}
 
 export async function registerForPushNotifications(): Promise<string | null> {
+  if (isExpoGo || !Notifications) {
+    console.log('Push notifications disabled in Expo Go');
+    return null;
+  }
+
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
@@ -41,11 +46,19 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 export function setupNotificationHandlers(): void {
-  Notifications.addNotificationReceivedListener(notification => {
-    // console.log('Notification received:', notification);
+  if (isExpoGo || !Notifications) {
+    console.log('Notification handlers disabled in Expo Go');
+    return;
+  }
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
   });
 
-  Notifications.addNotificationResponseReceivedListener(response => {
-    // console.log('Notification tapped:', response);
-  });
+  Notifications.addNotificationReceivedListener(() => {});
+  Notifications.addNotificationResponseReceivedListener(() => {});
 }

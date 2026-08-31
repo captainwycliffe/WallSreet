@@ -2,17 +2,17 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.db.session import get_session
-from app.core.dependencies import get_current_active_user
+from app.core.dependencies import get_current_active_user, resolve_account_id
 from app.models.user import User
 from app.schemas.poi import POIResponse, POIListResponse, POIUpdate
 from app.models.poi import POIStatus, Direction
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 router = APIRouter(prefix="/pois", tags=["pois"])
 
 @router.get("", response_model=POIListResponse)
 async def get_pois(
-    account_id: str,
+    account_id: Optional[str] = None,
     status: Optional[POIStatus] = None,
     symbol: Optional[str] = None,
     direction: Optional[Direction] = None,
@@ -23,21 +23,25 @@ async def get_pois(
     db: AsyncSession = Depends(get_session)
 ):
     from app.models.poi import POI
+    account_id = await resolve_account_id(account_id, current_user, db)
+
     query = select(POI).where(POI.account_id == account_id)
     if status: query = query.where(POI.status == status)
     if symbol: query = query.where(POI.symbol == symbol)
     if direction: query = query.where(POI.direction == direction)
     if timeframe: query = query.where(POI.timeframe == timeframe)
-    
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_query)).scalar_one()
+
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     pois = list(result.scalars().all())
-    
-    count_query = select(POI.id).where(POI.account_id == account_id)
-    count_result = await db.execute(count_query)
-    total = len(count_result.scalars().all())
-    
-    return POIListResponse(data=pois, total=total)
+
+    page = (skip // limit) + 1 if limit else 1
+    pages = (total + limit - 1) // limit if limit else 1
+
+    return POIListResponse(items=pois, total=total, page=page, pages=pages)
 
 @router.get("/{id}", response_model=POIResponse)
 async def get_poi(

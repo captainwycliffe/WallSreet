@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { analyticsService, riskService } from '../services/api';
+import { analyticsService } from '../services/api';
 import { AnalyticsFilter } from '../types/analytics';
 
 export function useAnalyticsMetrics(filters?: AnalyticsFilter) {
@@ -20,23 +20,15 @@ export function useAnalyticsMetrics(filters?: AnalyticsFilter) {
   });
 }
 
-export function useRiskDashboard() {
+export function useEquityCurve(filters?: AnalyticsFilter) {
   return useQuery({
-    queryKey: ['riskDashboard'],
+    queryKey: ['equityCurve', filters],
     queryFn: async () => {
       try {
-        return await riskService.getDashboard();
+        return await analyticsService.getEquityCurve(filters);
       } catch (e) {
-        return {
-          open_risk_pct: 1.2, daily_risk_pct: 2.1,
-          daily_pl: 150, daily_drawdown_pct: 0.5,
-          max_drawdown_pct: 2.5, total_exposure_pct: 3.5,
-          risk_per_trade_pct: 1.0,
-          warnings: [],
-          limits: { daily_risk_limit_pct: 5.0, max_drawdown_pct: 10.0, risk_per_trade_pct: 2.0 }
-        };
+        return { equity_curve: [], daily_pl: [] };
       }
-    },
-    refetchInterval: 30000
+    }
   });
 }

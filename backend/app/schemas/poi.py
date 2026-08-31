@@ -2,7 +2,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Any
 from datetime import datetime
 from app.models.poi import POIStatus, Direction
-
 class POICreate(BaseModel):
     symbol: str
     timeframe: str
@@ -41,12 +40,15 @@ class POIResponse(BaseModel):
     expires_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
-    
-    model_config = ConfigDict(from_attributes=True)
+    metadata: Optional[dict[str, Any]] = Field(default=None, validation_alias="metadata_data")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class POIListResponse(BaseModel):
-    data: list[POIResponse]
+    items: list[POIResponse]
     total: int
+    page: int
+    pages: int
 
 class POIFilter(BaseModel):
     status: Optional[POIStatus] = None

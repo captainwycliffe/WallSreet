@@ -52,6 +52,35 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
         raise AuthenticationError("Inactive user")
     return current_user
 
+async def resolve_account_id(
+    account_id: Optional[str],
+    current_user: User,
+    db: AsyncSession,
+) -> str:
+    """
+    If account_id is supplied, verify the current user owns it. If not
+    supplied, fall back to the user's first (active) account. Raises
+    AuthenticationError-style app exceptions the same way the rest of the
+    API does, so callers can just `await resolve_account_id(...)` and trust
+    the result belongs to current_user.
+    """
+    from app.repositories.account_repo import AccountRepository
+    from app.core.exceptions import NotFoundError, AuthorizationError
+
+    repo = AccountRepository(db)
+    if account_id:
+        account = await repo.get(account_id)
+        if not account:
+            raise NotFoundError("Account not found")
+        if account.user_id != current_user.id:
+            raise AuthorizationError("Not your account")
+        return account_id
+
+    accounts = await repo.get_all_for_user(current_user.id)
+    if not accounts:
+        raise NotFoundError("No accounts found for this user — create one first")
+    return accounts[0].id
+
 async def get_ea_from_api_key(
     request: Request,
     db: AsyncSession = Depends(get_db)

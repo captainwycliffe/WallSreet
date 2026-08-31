@@ -1,6 +1,6 @@
 import { View, Text, TextInput, Alert, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../../components/ui/Button';
 
@@ -59,6 +59,10 @@ export default function LoginScreen() {
           variant="secondary"
           onPress={() => { setEmail('demo@mt5app.com'); setPassword('demo1234'); }} 
         />
+
+        <Link href="/(auth)/register" asChild>
+          <Button title="Create an account" variant="ghost" />
+        </Link>
       </View>
     </View>
   );

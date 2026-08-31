@@ -6,5 +6,5 @@ export interface RiskDashboard {
   warnings: RiskWarning[];
   limits: RiskLimits;
 }
-export interface RiskWarning { type: string; message: string; severity: 'LOW'|'MEDIUM'|'HIGH'; }
+export interface RiskWarning { type: string; message: string; severity: 'LOW'|'MEDIUM'|'HIGH'|'CRITICAL'; }
 export interface RiskLimits { daily_risk_limit_pct: number; max_drawdown_pct: number; risk_per_trade_pct: number; }

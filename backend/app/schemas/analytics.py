@@ -11,24 +11,28 @@ class AnalyticsFilter(BaseModel):
 class MetricsResponse(BaseModel):
     total_trades: int
     win_rate: float
+    winning_trades: int
+    losing_trades: int
     average_win: float
     average_loss: float
     profit_factor: float
     expectancy: float
     average_r: float
     max_drawdown: float
-    total_net_profit: float
+    total_pl: float
+    total_net_pl: float
     best_trade: float
     worst_trade: float
 
 class EquityPoint(BaseModel):
-    timestamp: datetime
+    date: str
     equity: float
+    balance: float
 
 class DailyPLPoint(BaseModel):
     date: str
     pl: float
-    cumulative_pl: float
+    cumulative: float
 
 class AnalyticsResponse(BaseModel):
     metrics: MetricsResponse
@@ -36,3 +40,7 @@ class AnalyticsResponse(BaseModel):
     daily_pl: List[DailyPLPoint]
     r_distribution: dict
     win_loss_dist: dict
+
+class EquityCurveResponse(BaseModel):
+    equity_curve: List[EquityPoint]
+    daily_pl: List[DailyPLPoint]

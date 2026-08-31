@@ -15,6 +15,7 @@ class AccountUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class EACreate(BaseModel):
+    account_id: str
     name: str
     version: str
 
@@ -49,5 +50,6 @@ class AccountResponse(BaseModel):
     is_active: bool
     is_demo: bool
     created_at: datetime
-    
+    ea_registrations: list[EAResponse] = []
+
     model_config = ConfigDict(from_attributes=True)

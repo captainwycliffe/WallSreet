@@ -59,8 +59,10 @@ class TradeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class TradeListResponse(BaseModel):
-    data: list[TradeResponse]
+    items: list[TradeResponse]
     total: int
+    page: int
+    pages: int
 
 class TradeFilter(BaseModel):
     status: Optional[TradeStatus] = None
