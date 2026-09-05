@@ -14,7 +14,7 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
   const profit = trade.profit || 0;
   const prefix = profit >= 0 ? "+" : "";
   let progress = 0;
-  if (trade.current_price && trade.take_profit && trade.entry_price) {
+  if (trade.current_price && trade.take_profit && trade.entry_price && trade.take_profit > 0) {
     const totalDist = Math.abs(trade.take_profit - trade.entry_price);
     const currDist = isBuy
       ? Math.max(0, trade.current_price - trade.entry_price)
@@ -22,6 +22,16 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
     progress = Math.min(100, (currDist / totalDist) * 100);
   }
   const duration = formatDistanceToNow(new Date(trade.opened_at), { addSuffix: false });
+
+  const fmt = (val: number | undefined, isStopOrTarget = false) => {
+    if (val === undefined || val === null) return "-";
+    if (val === 0 && isStopOrTarget) return "None";
+    const isCrypto = trade.symbol.includes("BTC") || trade.symbol.includes("ETH") || trade.symbol.includes("XAU") || trade.symbol.includes("NAS");
+    return val.toLocaleString("en-US", {
+      minimumFractionDigits: isCrypto ? 2 : 4,
+      maximumFractionDigits: isCrypto ? 2 : 5,
+    });
+  };
 
   return (
     <Card onPress={onPress} style={styles.card}>
@@ -35,10 +45,10 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
 
       <View style={[styles.row, { marginBottom: 12 }]}>
         {[
-          { label: "Entry", value: trade.entry_price.toFixed(5), color: C.white },
-          { label: "Current", value: trade.current_price?.toFixed(5) || "-", color: C.white },
-          { label: "Stop", value: trade.stop_loss.toFixed(5), color: C.red },
-          { label: "Target", value: trade.take_profit.toFixed(5), color: C.green },
+          { label: "Entry", value: fmt(trade.entry_price), color: C.white },
+          { label: "Current", value: fmt(trade.current_price), color: C.white },
+          { label: "Stop", value: fmt(trade.stop_loss, true), color: C.red },
+          { label: "Target", value: fmt(trade.take_profit, true), color: C.green },
         ].map(({ label, value, color }) => (
           <View key={label}>
             <Text style={styles.label}>{label}</Text>
