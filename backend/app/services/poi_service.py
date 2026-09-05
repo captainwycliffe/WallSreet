@@ -29,7 +29,7 @@ class POIService:
             zone_high=req.zone_high,
             zone_low=req.zone_low,
             risk_reward=req.risk_reward,
-            status=POIStatus.DETECTED,
+            status=req.status if req.status else POIStatus.PENDING,
             idempotency_key=req.idempotency_key,
             metadata_data=req.metadata_data
         )

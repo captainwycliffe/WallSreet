@@ -4,15 +4,16 @@ from datetime import datetime
 from app.models.poi import POIStatus, Direction
 class POICreate(BaseModel):
     symbol: str
-    timeframe: str
+    timeframe: str = "M15"
     direction: Direction
     poi_type: str
     entry_price: float
-    stop_loss: float
-    take_profit: float
-    zone_high: float
-    zone_low: float
-    risk_reward: float
+    stop_loss: float = 0.0
+    take_profit: float = 0.0
+    zone_high: float = 0.0
+    zone_low: float = 0.0
+    risk_reward: float = 0.0
+    status: Optional[POIStatus] = POIStatus.PENDING
     idempotency_key: str
     metadata_data: Optional[dict[str, Any]] = None
 

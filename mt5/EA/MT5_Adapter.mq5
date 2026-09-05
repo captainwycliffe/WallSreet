@@ -159,6 +159,69 @@ private:
       }
    }
 
+   void SyncPendingOrders()
+   {
+      int total = OrdersTotal();
+      if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing %d pending orders as POIs...", total);
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = OrderGetTicket(i);
+         if(ticket == 0 || !OrderSelect(ticket)) continue;
+
+         ENUM_ORDER_TYPE otype = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+         string dir = "BUY";
+         string poi_type = "LIMIT_ORDER";
+         if(otype == ORDER_TYPE_BUY_LIMIT)             { dir = "BUY";  poi_type = "BUY_LIMIT"; }
+         else if(otype == ORDER_TYPE_SELL_LIMIT)       { dir = "SELL"; poi_type = "SELL_LIMIT"; }
+         else if(otype == ORDER_TYPE_BUY_STOP)         { dir = "BUY";  poi_type = "BUY_STOP"; }
+         else if(otype == ORDER_TYPE_SELL_STOP)        { dir = "SELL"; poi_type = "SELL_STOP"; }
+         else if(otype == ORDER_TYPE_BUY_STOP_LIMIT)   { dir = "BUY";  poi_type = "BUY_STOP_LIMIT"; }
+         else if(otype == ORDER_TYPE_SELL_STOP_LIMIT)  { dir = "SELL"; poi_type = "SELL_STOP_LIMIT"; }
+         else continue;
+
+         string symbol     = OrderGetString(ORDER_SYMBOL);
+         double entry      = OrderGetDouble(ORDER_PRICE_OPEN);
+         double sl         = OrderGetDouble(ORDER_SL);
+         double tp         = OrderGetDouble(ORDER_TP);
+         string idem_key   = "order_poi_" + IntegerToString(ticket);
+
+         double risk   = MathAbs(entry - sl);
+         double reward = MathAbs(entry - tp);
+         double rr     = (risk > 0) ? reward / risk : 0;
+         double zh     = entry + (risk > 0 ? risk : 10.0);
+         double zl     = entry - (risk > 0 ? risk : 10.0);
+
+         string json = StringFormat(
+            "{"
+            "\"idempotency_key\":\"%s\","
+            "\"symbol\":\"%s\","
+            "\"timeframe\":\"%s\","
+            "\"direction\":\"%s\","
+            "\"poi_type\":\"%s\","
+            "\"entry_price\":%.5f,"
+            "\"stop_loss\":%.5f,"
+            "\"take_profit\":%.5f,"
+            "\"zone_high\":%.5f,"
+            "\"zone_low\":%.5f,"
+            "\"risk_reward\":%.2f,"
+            "\"status\":\"PENDING\","
+            "\"metadata_data\":{\"mt5_order_ticket\":%llu,\"order_type\":\"%s\"}"
+            "}",
+            idem_key,
+            JsonEscape(symbol),
+            EnumToString(_Period),
+            dir,
+            poi_type,
+            entry, sl, tp, zh, zl, rr,
+            ticket, poi_type
+         );
+
+         string response;
+         SendHTTPPost("/api/mt5/poi", json, response);
+         Sleep(150);
+      }
+   }
+
 public:
    CMT5Adapter(const string api_key, const string backend_url, const int heartbeat_secs=15, const bool debug=true)
    {
@@ -177,6 +240,7 @@ public:
       SendHeartbeatInternal();
       m_last_heartbeat = TimeCurrent();
       SyncExistingPositions();
+      SyncPendingOrders();
       Print("[MT5Adapter] Adapter connected to: " + m_backend_url);
       return true;
    }
@@ -187,6 +251,7 @@ public:
       if(now - m_last_heartbeat >= m_heartbeat_secs)
       {
          SendHeartbeatInternal();
+         SyncPendingOrders();
          m_last_heartbeat = now;
       }
       CheckPositionUpdates();
@@ -382,6 +447,11 @@ public:
                ReportPositionClose(ticket, exit_price, profit, commission, swap, reason);
             }
          }
+      }
+
+      if(trans.type == TRADE_TRANSACTION_ORDER_ADD || trans.type == TRADE_TRANSACTION_ORDER_DELETE)
+      {
+         SyncPendingOrders();
       }
    }
 };
