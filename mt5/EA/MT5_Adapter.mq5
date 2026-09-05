@@ -113,12 +113,10 @@ private:
       if(now - m_last_position_update < m_update_interval_secs) return;
       m_last_position_update = now;
 
-      for(int i = 0; i < PositionsTotal(); i++)
       int total = PositionsTotal();
       for(int i = 0; i < total; i++)
       {
          ulong ticket = PositionGetTicket(i);
-         if(ticket == 0) continue;
          if(ticket == 0 || !PositionSelectByTicket(ticket)) continue;
 
          double current = PositionGetDouble(POSITION_PRICE_CURRENT);
@@ -127,8 +125,6 @@ private:
          double tp      = PositionGetDouble(POSITION_TP);
 
          string json = StringFormat(
-            "{\"ticket\":%llu,\"current_price\":%.5f,\"unrealized_profit\":%.2f,\"timestamp\":\"%s\"}",
-            ticket, current, profit,
             "{\"ticket\":%llu,\"current_price\":%.5f,\"profit\":%.2f,\"unrealized_profit\":%.2f,\"stop_loss\":%.5f,\"take_profit\":%.5f,\"timestamp\":\"%s\"}",
             ticket, current, profit, profit, sl, tp,
             TimeToString(now, TIME_DATE|TIME_MINUTES|TIME_SECONDS)
@@ -143,12 +139,10 @@ private:
    void SyncExistingPositions()
    {
       int total = PositionsTotal();
-      if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing %d open positions...", total);
       if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing %d open positions with real prices...", total);
       for(int i = 0; i < total; i++)
       {
          ulong ticket = PositionGetTicket(i);
-         if(ticket == 0) continue;
          if(ticket == 0 || !PositionSelectByTicket(ticket)) continue;
 
          string dir = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "BUY" : "SELL";

@@ -1,6 +1,9 @@
 -e __pycache__/
 *.pyc
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 .env
 node_modules/
 .expo/
