@@ -1,5 +1,7 @@
-import { View, Text, ScrollView, RefreshControl, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import { View, Text, ScrollView, RefreshControl, StyleSheet, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path, Defs, LinearGradient, Stop, Circle, Line } from "react-native-svg";
 import { BarChart3 } from "lucide-react-native";
 import { MetricCard } from "../../../components/ui/MetricCard";
 import { Card } from "../../../components/ui/Card";
@@ -11,30 +13,124 @@ const C = {
   white: "#FFFFFF", secondary: "#8888A8", green: "#00C896", red: "#FF4757",
 };
 
-function EquitySparkline({ points }: { points: { date: string; equity: number }[] }) {
-  if (points.length === 0) return null;
-  const values = points.map(p => p.equity);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
+function EquityLineGraph({ points }: { points: { date: string; equity: number }[] }) {
+  const [width, setWidth] = useState(Dimensions.get("window").width - 64);
+  if (!points || points.length === 0) return null;
+
+  // If there is only 1 point, add an initial reference point so a line can draw
+  const chartPoints = points.length === 1
+    ? [{ date: points[0].date, equity: points[0].equity }, points[0]]
+    : points.slice(-30);
+
+  const height = 140;
+  const padX = 14;
+  const padY = 18;
+
+  const values = chartPoints.map((p) => p.equity);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const range = maxVal - minVal || 1;
+
+  const first = chartPoints[0];
+  const latest = chartPoints[chartPoints.length - 1];
+  const diff = latest.equity - first.equity;
+  const isUp = diff >= 0;
+  const strokeColor = isUp ? C.green : C.red;
+  const gradId = isUp ? "eqUpGrad" : "eqDownGrad";
+
+  const coords = chartPoints.map((p, i) => {
+    const x = padX + (i / Math.max(chartPoints.length - 1, 1)) * (width - 2 * padX);
+    const y = height - padY - ((p.equity - minVal) / range) * (height - 2 * padY);
+    return { x, y };
+  });
+
+  // Build line path
+  let lineD = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  for (let i = 1; i < coords.length; i++) {
+    lineD += ` L ${coords[i].x.toFixed(1)} ${coords[i].y.toFixed(1)}`;
+  }
+
+  // Build gradient area path
+  const lastX = coords[coords.length - 1].x.toFixed(1);
+  const firstX = coords[0].x.toFixed(1);
+  const areaD = `${lineD} L ${lastX} ${height} L ${firstX} ${height} Z`;
+  const lastCoord = coords[coords.length - 1];
 
   return (
-    <View style={styles.sparklineRow}>
-      {points.slice(-30).map((p, i) => {
-        const heightPct = ((p.equity - min) / range) * 100;
-        return (
-          <View
-            key={i}
-            style={[
-              styles.sparklineBar,
-              {
-                height: `${Math.max(heightPct, 4)}%` as any,
-                opacity: 0.4 + (heightPct / 100) * 0.6,
-              },
-            ]}
-          />
-        );
-      })}
+    <View
+      style={styles.graphWrapper}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 60) setWidth(w);
+      }}
+    >
+      <Svg width={width} height={height}>
+        <Defs>
+          <LinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={strokeColor} stopOpacity={0.35} />
+            <Stop offset="70%" stopColor={strokeColor} stopOpacity={0.08} />
+            <Stop offset="100%" stopColor={strokeColor} stopOpacity={0.0} />
+          </LinearGradient>
+        </Defs>
+
+        {/* High & Low grid lines */}
+        <Line
+          x1={padX}
+          y1={padY}
+          x2={width - padX}
+          y2={padY}
+          stroke="#2A2A3A"
+          strokeDasharray="3, 3"
+          strokeWidth="1"
+        />
+        <Line
+          x1={padX}
+          y1={height - padY}
+          x2={width - padX}
+          y2={height - padY}
+          stroke="#2A2A3A"
+          strokeDasharray="3, 3"
+          strokeWidth="1"
+        />
+
+        {/* Gradient fill */}
+        <Path d={areaD} fill={`url(#${gradId})`} />
+
+        {/* Glowing Line */}
+        <Path
+          d={lineD}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Current price halo pulse */}
+        <Circle cx={lastCoord.x} cy={lastCoord.y} r={7} fill={strokeColor} opacity={0.3} />
+        <Circle cx={lastCoord.x} cy={lastCoord.y} r={3.5} fill="#FFFFFF" />
+      </Svg>
+
+      {/* Benchmark price labels on the right edge */}
+      <View style={styles.benchmarkOverlay}>
+        <Text style={styles.benchmarkText}>${maxVal.toFixed(2)}</Text>
+        <Text style={styles.benchmarkText}>${minVal.toFixed(2)}</Text>
+      </View>
+
+      {/* Bottom axis summary */}
+      <View style={styles.axisRow}>
+        <Text style={styles.axisDate}>
+          {chartPoints[0].date ? chartPoints[0].date.split("T")[0] : ""}
+        </Text>
+        <View style={[styles.changePill, { backgroundColor: isUp ? "#00C89618" : "#FF475718" }]}>
+          <Text style={[styles.changeText, { color: strokeColor }]}>
+            {isUp ? "+" : ""}${diff.toFixed(2)}
+          </Text>
+        </View>
+        <Text style={styles.axisDate}>
+          {chartPoints[chartPoints.length - 1].date ? chartPoints[chartPoints.length - 1].date.split("T")[0] : "Now"}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -79,11 +175,15 @@ export default function AnalyticsScreen() {
           <>
             {equity && equity.equity_curve.length > 0 && (
               <Card style={styles.card}>
-                <Text style={styles.cardLabel}>Equity curve</Text>
-                <Text style={styles.equityValue}>
-                  ${equity.equity_curve[equity.equity_curve.length - 1].equity.toFixed(2)}
-                </Text>
-                <EquitySparkline points={equity.equity_curve} />
+                <View style={styles.cardHeaderRow}>
+                  <View>
+                    <Text style={styles.cardLabel}>Equity Curve</Text>
+                    <Text style={styles.equityValue}>
+                      ${equity.equity_curve[equity.equity_curve.length - 1].equity.toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+                <EquityLineGraph points={equity.equity_curve} />
               </Card>
             )}
 
@@ -137,10 +237,33 @@ const styles = StyleSheet.create({
   title: { color: C.white, fontSize: 24, fontWeight: "700" },
   subtitle: { color: C.secondary, fontSize: 14, marginTop: 4 },
   card: { marginBottom: 12 },
+  cardHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   cardLabel: { color: C.secondary, fontSize: 12, marginBottom: 4 },
-  equityValue: { color: C.white, fontSize: 22, fontWeight: "700", marginBottom: 12 },
-  sparklineRow: { flexDirection: "row", alignItems: "flex-end", height: 96, gap: 2 },
-  sparklineBar: { flex: 1, backgroundColor: C.green, borderRadius: 2 },
+  equityValue: { color: C.white, fontSize: 24, fontWeight: "800", marginBottom: 8 },
+  graphWrapper: { position: "relative", marginTop: 8 },
+  benchmarkOverlay: {
+    position: "absolute",
+    right: 8,
+    top: 10,
+    bottom: 24,
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  benchmarkText: { color: C.secondary, fontSize: 10, fontWeight: "500" },
+  axisRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  axisDate: { color: C.secondary, fontSize: 11 },
+  changePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  changeText: { fontSize: 11, fontWeight: "700" },
   metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
   sectionTitle: { color: C.white, fontWeight: "600", fontSize: 15, marginBottom: 12 },
   breakdownRow: { flexDirection: "row", justifyContent: "space-between" },
