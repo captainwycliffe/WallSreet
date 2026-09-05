@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { AuthTokens } from '../types/auth';
 
 const TOKEN_KEY = 'auth_tokens';
@@ -6,6 +7,12 @@ const TOKEN_KEY = 'auth_tokens';
 export const storage = {
   setItem: async (key: string, value: string): Promise<void> => {
     try {
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem(key, value);
+        }
+        return;
+      }
       await SecureStore.setItemAsync(key, value);
     } catch (e) {
       console.error('Error saving to secure store', e);
@@ -13,6 +20,12 @@ export const storage = {
   },
   getItem: async (key: string): Promise<string | null> => {
     try {
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          return window.localStorage.getItem(key);
+        }
+        return null;
+      }
       return await SecureStore.getItemAsync(key);
     } catch (e) {
       console.error('Error reading from secure store', e);
@@ -21,6 +34,12 @@ export const storage = {
   },
   removeItem: async (key: string): Promise<void> => {
     try {
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.removeItem(key);
+        }
+        return;
+      }
       await SecureStore.deleteItemAsync(key);
     } catch (e) {
       console.error('Error removing from secure store', e);

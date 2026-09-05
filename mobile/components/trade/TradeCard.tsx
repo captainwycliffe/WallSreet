@@ -1,81 +1,81 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Trade } from '../../types/trade';
-import { Card } from '../ui/Card';
-import { StatusBadge } from '../ui/StatusBadge';
-import { formatDistanceToNow } from 'date-fns';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { Trade } from "../../types/trade";
+import { Card } from "../ui/Card";
+import { StatusBadge } from "../ui/StatusBadge";
+import { formatDistanceToNow } from "date-fns";
 
-interface TradeCardProps {
-  trade: Trade;
-  onPress?: () => void;
-}
+const C = { green: "#00C896", red: "#FF4757", white: "#FFFFFF", secondary: "#8888A8", surface2: "#1C1C28", cyan: "#00D4FF" };
+
+interface TradeCardProps { trade: Trade; onPress?: () => void; }
 
 export function TradeCard({ trade, onPress }: TradeCardProps) {
-  const isBuy = trade.direction === 'BUY';
-  const dirColor = isBuy ? 'text-green' : 'text-red';
-  const profitColor = (trade.profit || 0) >= 0 ? 'text-green' : 'text-red';
-  const prefix = (trade.profit || 0) >= 0 ? '+' : '';
-
-  // Calculate progress toward TP
+  const isBuy = trade.direction === "BUY";
+  const profit = trade.profit || 0;
+  const prefix = profit >= 0 ? "+" : "";
   let progress = 0;
   if (trade.current_price && trade.take_profit && trade.entry_price) {
     const totalDist = Math.abs(trade.take_profit - trade.entry_price);
-    const currDist = isBuy 
+    const currDist = isBuy
       ? Math.max(0, trade.current_price - trade.entry_price)
       : Math.max(0, trade.entry_price - trade.current_price);
     progress = Math.min(100, (currDist / totalDist) * 100);
   }
-
   const duration = formatDistanceToNow(new Date(trade.opened_at), { addSuffix: false });
 
   return (
-    <Card onPress={onPress} className="mb-4 w-full">
-      <View className="flex-row justify-between items-center mb-3">
-        <View className="flex-row items-center">
-          <Text className="text-white font-interBold text-lg mr-2">{trade.symbol}</Text>
-          <Text className={`font-interBold text-sm ${dirColor}`}>{trade.direction}</Text>
+    <Card onPress={onPress} style={styles.card}>
+      <View style={styles.row}>
+        <View style={styles.row}>
+          <Text style={styles.symbol}>{trade.symbol}</Text>
+          <Text style={[styles.dir, { color: isBuy ? C.green : C.red }]}>{trade.direction}</Text>
         </View>
         <StatusBadge status={trade.status} />
       </View>
 
-      <View className="flex-row justify-between mb-4">
-        <View>
-          <Text className="text-textSecondary text-xs mb-1">Entry</Text>
-          <Text className="text-white font-interMedium">{trade.entry_price.toFixed(5)}</Text>
-        </View>
-        <View>
-          <Text className="text-textSecondary text-xs mb-1">Current</Text>
-          <Text className="text-white font-interMedium">{trade.current_price?.toFixed(5) || '-'}</Text>
-        </View>
-        <View>
-          <Text className="text-textSecondary text-xs mb-1">Stop</Text>
-          <Text className="text-red font-interMedium">{trade.stop_loss.toFixed(5)}</Text>
-        </View>
-        <View>
-          <Text className="text-textSecondary text-xs mb-1">Target</Text>
-          <Text className="text-green font-interMedium">{trade.take_profit.toFixed(5)}</Text>
-        </View>
+      <View style={[styles.row, { marginBottom: 12 }]}>
+        {[
+          { label: "Entry", value: trade.entry_price.toFixed(5), color: C.white },
+          { label: "Current", value: trade.current_price?.toFixed(5) || "-", color: C.white },
+          { label: "Stop", value: trade.stop_loss.toFixed(5), color: C.red },
+          { label: "Target", value: trade.take_profit.toFixed(5), color: C.green },
+        ].map(({ label, value, color }) => (
+          <View key={label}>
+            <Text style={styles.label}>{label}</Text>
+            <Text style={[styles.value, { color }]}>{value}</Text>
+          </View>
+        ))}
       </View>
 
-      <View className="flex-row justify-between items-end mb-3">
+      <View style={[styles.row, { marginBottom: 10 }]}>
         <View>
-          <Text className={`${profitColor} font-interBold text-xl`}>
-            {prefix}${trade.profit?.toFixed(2) || '0.00'}
+          <Text style={[styles.profit, { color: profit >= 0 ? C.green : C.red }]}>
+            {prefix}${profit.toFixed(2)}
           </Text>
-          <Text className={`${profitColor} text-xs font-inter`}>
-            {prefix}{trade.r_multiple?.toFixed(2) || '0.00'}R
+          <Text style={[styles.rr, { color: profit >= 0 ? C.green : C.red }]}>
+            {prefix}{trade.r_multiple?.toFixed(2) || "0.00"}R
           </Text>
         </View>
-        <Text className="text-textSecondary text-xs font-inter">{duration}</Text>
+        <Text style={styles.duration}>{duration}</Text>
       </View>
 
-      {/* Progress Bar */}
-      <View className="h-2 bg-surface2 rounded-full overflow-hidden w-full">
-        <View 
-          className={`h-full ${isBuy ? 'bg-green' : 'bg-red'}`} 
-          style={{ width: `${progress}%` }} 
-        />
+      <View style={styles.progressBg}>
+        <View style={[styles.progressFill, { width: `${progress}%` as any, backgroundColor: isBuy ? C.green : C.red }]} />
       </View>
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  card: { marginBottom: 12 },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  symbol: { color: C.white, fontWeight: "700", fontSize: 17, marginRight: 8 },
+  dir: { fontWeight: "700", fontSize: 13 },
+  label: { color: C.secondary, fontSize: 11, marginBottom: 4 },
+  value: { color: C.white, fontWeight: "500", fontSize: 13 },
+  profit: { fontWeight: "700", fontSize: 20 },
+  rr: { fontSize: 12, marginTop: 2 },
+  duration: { color: C.secondary, fontSize: 12 },
+  progressBg: { height: 6, backgroundColor: "#1C1C28", borderRadius: 3, overflow: "hidden" },
+  progressFill: { height: "100%" as any, borderRadius: 3 },
+});

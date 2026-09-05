@@ -22,15 +22,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (email, password) => {
     try {
-      if (email === 'demo@mt5app.com' && password === 'demo1234') {
-        set({ user: mockUser as User, isAuthenticated: true });
-        return;
-      }
+      // 1. Authenticate with real backend to get JWT access/refresh tokens
       const data = await authService.login({ email, password });
       await storage.setTokens(data);
       const user = await authService.getMe();
       set({ user, isAuthenticated: true });
     } catch (error) {
+      // Fallback only if offline demo
+      if (email === 'demo@mt5app.com' && password === 'demo1234') {
+        console.warn('Backend unreachable, logging in with offline demo mode');
+        set({ user: mockUser as User, isAuthenticated: true });
+        return;
+      }
       throw error;
     }
   },
@@ -58,7 +61,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user, isAuthenticated: true });
       }
     } catch (error) {
-      // Ignored for demo
+      // If token expired or invalid, clear
+      await storage.clearTokens();
+      set({ user: null, isAuthenticated: false });
     } finally {
       set({ isLoading: false });
     }

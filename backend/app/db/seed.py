@@ -95,7 +95,7 @@ async def seed_demo_data(session: AsyncSession) -> None:
     DEMO_EA_KEY = "mt5ea_demo_key_12345"
     ea_main = EARegistration(
         account_id=main_acc.id,
-        name="ICT EA v1",
+        name="DailyCodeMethod_Multi",
         api_key=hash_api_key(DEMO_EA_KEY),
         version="1.4.2",
         status=EARegistrationStatus.ONLINE,

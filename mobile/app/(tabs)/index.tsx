@@ -1,57 +1,456 @@
-import { View, Text, ScrollView, RefreshControl } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+  StyleSheet,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { useAccounts } from '../../hooks/useAccount';
-import { useState } from 'react';
+import { usePOIs } from '../../hooks/usePOIs';
+import { useTrades } from '../../hooks/useTrades';
+import { useQuery } from '@tanstack/react-query';
+import { eaService } from '../../services/api';
+import { TradeCard } from '../../components/trade/TradeCard';
+import { POICard } from '../../components/poi/POICard';
+import { Cpu, ArrowRight, TrendingUp, Target } from 'lucide-react-native';
+
+const C = {
+  bg: '#0A0A0F',
+  surface: '#12121A',
+  surface2: '#1C1C28',
+  border: '#2A2A3A',
+  green: '#00C896',
+  red: '#FF4757',
+  amber: '#FFB800',
+  cyan: '#00D4FF',
+  purple: '#9C6FFF',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+  textMuted: '#555577',
+};
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const { user } = useAuthStore();
-  const { data: accounts, refetch, isFetching } = useAccounts();
+  const { data: accounts, refetch: refetchAccounts, isFetching: isFetchingAccounts } = useAccounts();
+  const { data: poisData, refetch: refetchPOIs, isFetching: isFetchingPOIs } = usePOIs();
+  const { data: tradesData, refetch: refetchTrades, isFetching: isFetchingTrades } = useTrades();
+
+  const { data: eas, refetch: refetchEAs } = useQuery({
+    queryKey: ['eaMonitor'],
+    queryFn: () => eaService.getMonitor(),
+    refetchInterval: 10000,
+  });
+
+  const isFetching = isFetchingAccounts || isFetchingPOIs || isFetchingTrades;
+  const refetchAll = () => {
+    refetchAccounts();
+    refetchPOIs();
+    refetchTrades();
+    refetchEAs();
+  };
+
   const account = accounts?.[0];
+  const activeEA = eas?.[0];
+  const isEAOnline = activeEA?.status === 'ONLINE';
+
+  const pois = poisData?.items || [];
+  const trades = tradesData?.items || [];
+
+  const activeTrades = trades.filter((t) => t.status === 'OPEN');
+  const pendingPOIs = pois.filter((p) => p.status === 'PENDING');
+  const activePOIs = pois.filter((p) => p.status === 'ACTIVE');
+  const tpHits = pois.filter((p) => p.status === 'TP_HIT').length;
+  const slHits = pois.filter((p) => p.status === 'SL_HIT').length;
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <ScrollView 
-        className="flex-1 px-4"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor="#00C896" />}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching}
+            onRefresh={refetchAll}
+            tintColor={C.green}
+          />
+        }
+        showsVerticalScrollIndicator={false}
       >
-        <View className="mt-6 mb-8">
-          <Text className="text-textSecondary text-lg font-inter">Good morning,</Text>
-          <Text className="text-white text-2xl font-interBold">{user?.username || 'Trader'}</Text>
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerLabel}>TRADING COMMAND CENTER</Text>
+            <Text style={styles.headerGreeting}>
+              Hello, {user?.username ?? 'Trader'}
+            </Text>
+          </View>
+          <View style={[styles.eaPill, { backgroundColor: isEAOnline ? '#00C89622' : '#FF475722' }]}>
+            <View style={[styles.eaDot, { backgroundColor: isEAOnline ? C.green : C.red }]} />
+            <Text style={[styles.eaPillText, { color: isEAOnline ? C.green : C.red }]}>
+              {isEAOnline ? 'ONLINE' : 'OFFLINE'}
+            </Text>
+          </View>
         </View>
 
-        {account && (
-          <View className="bg-surface p-4 rounded-2xl mb-6 border border-border">
-            <Text className="text-textSecondary text-sm mb-1">{account.name}</Text>
-            <Text className="text-white text-3xl font-interBold">${account.balance.toFixed(2)}</Text>
-            
-            <View className="flex-row justify-between mt-6">
-              <View>
-                <Text className="text-textSecondary text-xs">Equity</Text>
-                <Text className="text-white text-md font-interMedium">${account.equity.toFixed(2)}</Text>
-              </View>
-              <View>
-                <Text className="text-textSecondary text-xs">Open P/L</Text>
-                <Text className={`text-md font-interMedium ${account.open_pl >= 0 ? 'text-green' : 'text-red'}`}>
-                  {account.open_pl >= 0 ? '+' : ''}{account.open_pl.toFixed(2)}
+        {/* ── Account Card ── */}
+        {account ? (
+          <View style={styles.card}>
+            <Text style={styles.accountBrokerLabel}>
+              {account.broker ?? 'Broker'} · {account.name ?? 'Account'}
+            </Text>
+            <Text style={styles.accountBalance}>
+              ${Number(account.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            <Text style={styles.accountBalanceLabel}>Balance</Text>
+
+            <View style={styles.accountMetricsRow}>
+              <View style={styles.accountMetric}>
+                <Text style={styles.accountMetricLabel}>Equity</Text>
+                <Text style={styles.accountMetricValue}>
+                  ${Number(account.equity ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
-              <View>
-                <Text className="text-textSecondary text-xs">Daily P/L</Text>
-                <Text className={`text-md font-interMedium ${account.daily_pl >= 0 ? 'text-green' : 'text-red'}`}>
-                  {account.daily_pl >= 0 ? '+' : ''}{account.daily_pl.toFixed(2)}
+              <View style={styles.metricDivider} />
+              <View style={styles.accountMetric}>
+                <Text style={styles.accountMetricLabel}>Open P/L</Text>
+                <Text style={[
+                  styles.accountMetricValue,
+                  { color: (account.openPL ?? 0) >= 0 ? C.green : C.red },
+                ]}>
+                  {(account.openPL ?? 0) >= 0 ? '+' : ''}
+                  ${Number(account.openPL ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <View style={styles.metricDivider} />
+              <View style={styles.accountMetric}>
+                <Text style={styles.accountMetricLabel}>Daily P/L</Text>
+                <Text style={[
+                  styles.accountMetricValue,
+                  { color: (account.dailyPL ?? 0) >= 0 ? C.green : C.red },
+                ]}>
+                  {(account.dailyPL ?? 0) >= 0 ? '+' : ''}
+                  ${Number(account.dailyPL ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
             </View>
           </View>
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.emptyText}>No account connected</Text>
+          </View>
         )}
 
-        <Text className="text-white font-interSemiBold text-lg mb-4">Market Overview</Text>
-        <View className="bg-surface p-6 rounded-2xl border border-border items-center justify-center min-h-[200px]">
-          <Text className="text-textSecondary text-center">Dashboard data loading...</Text>
+        {/* ── POI Counter Row ── */}
+        <View style={styles.poiCounterRow}>
+          <View style={[styles.poiCounterBox, { borderColor: C.amber }]}>
+            <Text style={[styles.poiCounterValue, { color: C.amber }]}>{pendingPOIs.length}</Text>
+            <Text style={styles.poiCounterLabel}>Pending</Text>
+          </View>
+          <View style={[styles.poiCounterBox, { borderColor: C.cyan }]}>
+            <Text style={[styles.poiCounterValue, { color: C.cyan }]}>{activePOIs.length}</Text>
+            <Text style={styles.poiCounterLabel}>Active</Text>
+          </View>
+          <View style={[styles.poiCounterBox, { borderColor: C.green }]}>
+            <Text style={[styles.poiCounterValue, { color: C.green }]}>{tpHits}</Text>
+            <Text style={styles.poiCounterLabel}>TP Hit</Text>
+          </View>
+          <View style={[styles.poiCounterBox, { borderColor: C.red }]}>
+            <Text style={[styles.poiCounterValue, { color: C.red }]}>{slHits}</Text>
+            <Text style={styles.poiCounterLabel}>SL Hit</Text>
+          </View>
         </View>
-        
+
+        {/* ── Active Trades ── */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderLeft}>
+            <TrendingUp size={18} color={C.green} />
+            <Text style={styles.sectionTitle}>Active Trades</Text>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>{activeTrades.length}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.sectionAction}
+            onPress={() => router.push('/(tabs)/trades')}
+          >
+            <Text style={styles.sectionActionText}>View All</Text>
+            <ArrowRight size={14} color={C.green} />
+          </TouchableOpacity>
+        </View>
+
+        {activeTrades.length > 0 ? (
+          activeTrades.slice(0, 5).map((trade) => (
+            <View key={trade.id} style={styles.cardItem}>
+              <TradeCard trade={trade} />
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <TrendingUp size={32} color={C.textMuted} />
+            <Text style={styles.emptyStateTitle}>No Active Trades</Text>
+            <Text style={styles.emptyStateSubtitle}>Open positions will appear here</Text>
+          </View>
+        )}
+
+        {/* ── Pending POIs ── */}
+        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+          <View style={styles.sectionHeaderLeft}>
+            <Target size={18} color={C.amber} />
+            <Text style={styles.sectionTitle}>Pending POIs</Text>
+            <View style={[styles.sectionBadge, { backgroundColor: '#FFB80022' }]}>
+              <Text style={[styles.sectionBadgeText, { color: C.amber }]}>{pendingPOIs.length}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.sectionAction}
+            onPress={() => router.push('/(tabs)/pois')}
+          >
+            <Text style={styles.sectionActionText}>View All</Text>
+            <ArrowRight size={14} color={C.green} />
+          </TouchableOpacity>
+        </View>
+
+        {pendingPOIs.length > 0 ? (
+          pendingPOIs.slice(0, 5).map((poi) => (
+            <View key={poi.id} style={styles.cardItem}>
+              <POICard poi={poi} />
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Target size={32} color={C.textMuted} />
+            <Text style={styles.emptyStateTitle}>No Pending POIs</Text>
+            <Text style={styles.emptyStateSubtitle}>Pending zones will appear here</Text>
+          </View>
+        )}
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+
+  // ── Header ──
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  headerLeft: {
+    flexDirection: 'column',
+  },
+  headerLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: C.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  headerGreeting: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: C.white,
+  },
+  eaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  eaDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    marginRight: 6,
+  },
+  eaPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+
+  // ── Account Card ──
+  card: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 16,
+    marginBottom: 16,
+  },
+  accountBrokerLabel: {
+    fontSize: 12,
+    color: C.textSecondary,
+    marginBottom: 6,
+  },
+  accountBalance: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: C.white,
+    letterSpacing: -0.5,
+  },
+  accountBalanceLabel: {
+    fontSize: 12,
+    color: C.textMuted,
+    marginTop: 2,
+    marginBottom: 16,
+  },
+  accountMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  accountMetric: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  accountMetricLabel: {
+    fontSize: 11,
+    color: C.textSecondary,
+    marginBottom: 4,
+  },
+  accountMetricValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.white,
+  },
+  metricDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: C.border,
+  },
+
+  // ── POI Counter Row ──
+  poiCounterRow: {
+    flexDirection: 'row',
+    marginBottom: 24,
+    gap: 8,
+  },
+  poiCounterBox: {
+    flex: 1,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  poiCounterValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  poiCounterLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textSecondary,
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  // ── Section Headers ──
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: C.white,
+    marginLeft: 8,
+  },
+  sectionBadge: {
+    backgroundColor: '#00C89622',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  sectionBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.green,
+  },
+  sectionAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionActionText: {
+    fontSize: 13,
+    color: C.green,
+    marginRight: 4,
+  },
+
+  // ── Card Items ──
+  cardItem: {
+    marginBottom: 10,
+  },
+
+  // ── Empty States ──
+  emptyState: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingVertical: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  emptyStateTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.textSecondary,
+    marginTop: 12,
+  },
+  emptyStateSubtitle: {
+    fontSize: 12,
+    color: C.textMuted,
+    marginTop: 4,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: C.textMuted,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+
+  // ── Bottom Spacer ──
+  bottomSpacer: {
+    height: 32,
+  },
+});

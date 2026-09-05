@@ -1,55 +1,56 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
 
-type StatusType = 
-  | 'DETECTED' | 'PENDING' | 'ACTIVE' | 'TP_HIT' | 'SL_HIT' 
-  | 'CLOSED' | 'EXPIRED' | 'CANCELLED' | 'INVALIDATED'
-  | 'OPEN' | 'ONLINE' | 'OFFLINE';
+type StatusType =
+  | "DETECTED" | "PENDING" | "ACTIVE" | "TP_HIT" | "SL_HIT"
+  | "CLOSED" | "EXPIRED" | "CANCELLED" | "INVALIDATED"
+  | "OPEN" | "ONLINE" | "OFFLINE";
 
-interface StatusBadgeProps {
-  status: StatusType;
-  className?: string;
-}
+interface StatusBadgeProps { status: StatusType; }
 
-export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
-  let bgColor = "bg-surface2";
-  let textColor = "text-textSecondary";
-  let showDot = false;
-  let dotColor = "";
+const STATUS_CONFIG: Record<string, { bg: string; color: string; dot?: string }> = {
+  PENDING:    { bg: "rgba(255,184,0,0.12)",   color: "#FFB800" },
+  DETECTED:   { bg: "rgba(255,184,0,0.12)",   color: "#FFB800" },
+  ACTIVE:     { bg: "rgba(0,212,255,0.12)",   color: "#00D4FF", dot: "#00D4FF" },
+  OPEN:       { bg: "rgba(0,212,255,0.12)",   color: "#00D4FF", dot: "#00D4FF" },
+  TP_HIT:     { bg: "rgba(0,200,150,0.12)",   color: "#00C896" },
+  ONLINE:     { bg: "rgba(0,200,150,0.12)",   color: "#00C896", dot: "#00C896" },
+  SL_HIT:     { bg: "rgba(255,71,87,0.12)",   color: "#FF4757" },
+  OFFLINE:    { bg: "rgba(255,71,87,0.12)",   color: "#FF4757", dot: "#FF4757" },
+  CLOSED:     { bg: "#1C1C28",               color: "#555577" },
+  EXPIRED:    { bg: "#1C1C28",               color: "#555577" },
+  CANCELLED:  { bg: "#1C1C28",               color: "#555577" },
+  INVALIDATED:{ bg: "#1C1C28",               color: "#555577" },
+};
 
-  switch (status) {
-    case 'PENDING':
-      bgColor = "bg-[#FFB80020]"; textColor = "text-amber";
-      break;
-    case 'ACTIVE':
-    case 'OPEN':
-      bgColor = "bg-[#00D4FF20]"; textColor = "text-cyan"; showDot = true; dotColor = "bg-cyan";
-      break;
-    case 'TP_HIT':
-      bgColor = "bg-[#00C89620]"; textColor = "text-green";
-      break;
-    case 'SL_HIT':
-      bgColor = "bg-[#FF475720]"; textColor = "text-red";
-      break;
-    case 'EXPIRED':
-    case 'CANCELLED':
-    case 'INVALIDATED':
-      bgColor = "bg-surface2"; textColor = "text-textMuted";
-      break;
-    case 'ONLINE':
-      bgColor = "bg-surface2"; textColor = "text-green"; showDot = true; dotColor = "bg-green";
-      break;
-    case 'OFFLINE':
-      bgColor = "bg-surface2"; textColor = "text-red"; showDot = true; dotColor = "bg-red";
-      break;
-    default:
-      bgColor = "bg-surface2"; textColor = "text-textSecondary";
-  }
-
+export function StatusBadge({ status }: StatusBadgeProps) {
+  const cfg = STATUS_CONFIG[status] || { bg: "#1C1C28", color: "#8888A8" };
   return (
-    <View className={`flex-row items-center self-start px-2 py-1 rounded-md ${bgColor} ${className}`}>
-      {showDot && <View className={`w-1.5 h-1.5 rounded-full mr-1.5 ${dotColor}`} />}
-      <Text className={`text-xs font-interSemiBold ${textColor}`}>{status}</Text>
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      {cfg.dot && <View style={[styles.dot, { backgroundColor: cfg.dot }]} />}
+      <Text style={[styles.text, { color: cfg.color }]}>{status.replace("_", " ")}</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 5,
+  },
+  text: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+});

@@ -1,7 +1,16 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from pydantic import BaseModel, ConfigDict, field_validator
+from typing import Optional, Union
 from datetime import datetime
 from app.models.trade import TradeStatus, TradeDirection
+
+def parse_mql_datetime(v: Union[datetime, str, None]) -> Optional[datetime]:
+    if v is None or isinstance(v, datetime):
+        return v
+    try:
+        clean = v.replace(".", "-")
+        return datetime.fromisoformat(clean)
+    except Exception:
+        return datetime.utcnow()
 
 class TradeCreate(BaseModel):
     mt5_ticket: int
@@ -11,28 +20,43 @@ class TradeCreate(BaseModel):
     entry_price: float
     stop_loss: float
     take_profit: float
-    current_price: float
-    opened_at: datetime
+    current_price: Optional[float] = None
+    opened_at: Optional[Union[datetime, str]] = None
     poi_id: Optional[str] = None
     idempotency_key: str
+
+    @field_validator("opened_at", mode="before")
+    def validate_opened_at(cls, v):
+        return parse_mql_datetime(v)
+
+    @field_validator("poi_id", mode="before")
+    def validate_poi_id(cls, v):
+        if not v or v == "" or v == "null":
+            return None
+        return v
 
 class TradeUpdate(BaseModel):
     current_price: Optional[float] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     profit: Optional[float] = None
+    unrealized_profit: Optional[float] = None
 
 class TradeClose(BaseModel):
     exit_price: float
     profit: float
-    commission: float
-    swap: float
-    closed_at: datetime
-    idempotency_key: str
+    commission: float = 0.0
+    swap: float = 0.0
+    closed_at: Optional[Union[datetime, str]] = None
+    idempotency_key: str = ""
+
+    @field_validator("closed_at", mode="before")
+    def validate_closed_at(cls, v):
+        return parse_mql_datetime(v)
 
 class TradeResponse(BaseModel):
     id: str
-    poi_id: Optional[str]
+    poi_id: Optional[str] = None
     account_id: str
     mt5_ticket: int
     symbol: str
@@ -41,19 +65,19 @@ class TradeResponse(BaseModel):
     entry_price: float
     stop_loss: float
     take_profit: float
-    current_price: float
-    exit_price: Optional[float]
-    profit: float
-    commission: float
-    swap: float
-    net_profit: float
-    risk_amount: float
-    reward_amount: float
-    r_multiple: float
-    pips: float
+    current_price: Optional[float] = None
+    exit_price: Optional[float] = None
+    profit: Optional[float] = 0.0
+    commission: Optional[float] = 0.0
+    swap: Optional[float] = 0.0
+    net_profit: Optional[float] = 0.0
+    risk_amount: Optional[float] = 0.0
+    reward_amount: Optional[float] = 0.0
+    r_multiple: Optional[float] = 0.0
+    pips: Optional[float] = 0.0
     status: TradeStatus
     opened_at: datetime
-    closed_at: Optional[datetime]
+    closed_at: Optional[datetime] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

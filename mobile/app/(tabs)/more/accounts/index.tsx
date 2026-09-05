@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, RefreshControl, TextInput, Switch, Alert } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, TextInput, Switch, Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,15 @@ import { LoadingSkeleton } from '../../../../components/common/LoadingSkeleton';
 import { useAccounts } from '../../../../hooks/useAccount';
 import { useAccountStore } from '../../../../store/accountStore';
 import { accountsService } from '../../../../services/api';
+
+const C = {
+  bg: '#0A0A0F',
+  surface2: '#1C1C28',
+  border: '#2A2A3A',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+  green: '#00C896',
+};
 
 export default function AccountsScreen() {
   const { data: accounts, isLoading, isFetching, error, refetch } = useAccounts();
@@ -46,7 +55,7 @@ export default function AccountsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.screen}>
       <Header
         title="Accounts"
         subtitle="Your connected MT5 accounts"
@@ -55,55 +64,59 @@ export default function AccountsScreen() {
         }
       />
       <ScrollView
-        className="flex-1 px-4"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor="#00C896" />}
+        style={styles.scroll}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
       >
         {showForm && (
-          <Card className="mt-4 mb-2">
-            <Text className="text-white font-interSemiBold mb-3">New account</Text>
+          <Card style={styles.formCard}>
+            <Text style={styles.formTitle}>New account</Text>
             <TextInput
-              className="bg-surface2 text-white px-4 py-3 rounded-xl border border-border mb-3"
+              style={styles.input}
               placeholder="Account name"
-              placeholderTextColor="#8888A8"
+              placeholderTextColor={C.textSecondary}
               value={name}
               onChangeText={setName}
             />
             <TextInput
-              className="bg-surface2 text-white px-4 py-3 rounded-xl border border-border mb-3"
+              style={styles.input}
               placeholder="Broker"
-              placeholderTextColor="#8888A8"
+              placeholderTextColor={C.textSecondary}
               value={broker}
               onChangeText={setBroker}
             />
             <TextInput
-              className="bg-surface2 text-white px-4 py-3 rounded-xl border border-border mb-3"
+              style={styles.input}
               placeholder="Account number"
-              placeholderTextColor="#8888A8"
+              placeholderTextColor={C.textSecondary}
               keyboardType="number-pad"
               value={accountNumber}
               onChangeText={setAccountNumber}
             />
             <TextInput
-              className="bg-surface2 text-white px-4 py-3 rounded-xl border border-border mb-3"
+              style={styles.input}
               placeholder="Currency (e.g. USD)"
-              placeholderTextColor="#8888A8"
+              placeholderTextColor={C.textSecondary}
               autoCapitalize="characters"
               value={currency}
               onChangeText={setCurrency}
             />
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-white">Demo account</Text>
-              <Switch value={isDemo} onValueChange={setIsDemo} trackColor={{ true: '#00C896' }} />
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Demo account</Text>
+              <Switch value={isDemo} onValueChange={setIsDemo} trackColor={{ true: C.green, false: undefined }} />
             </View>
             <Button title="Create Account" onPress={handleCreate} loading={creating} />
           </Card>
         )}
 
-        <View className="mt-4">
+        <View style={styles.listContent}>
           {isLoading ? (
-            <View className="space-y-3">
-              <LoadingSkeleton height={120} />
-              <LoadingSkeleton height={120} />
+            <View>
+              <View style={styles.skeletonItem}>
+                <LoadingSkeleton height={120} />
+              </View>
+              <View style={styles.skeletonItem}>
+                <LoadingSkeleton height={120} />
+              </View>
             </View>
           ) : error && !accounts ? (
             <ErrorState message="Couldn't load accounts." onRetry={refetch} />
@@ -130,3 +143,48 @@ export default function AccountsScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  formCard: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  formTitle: {
+    color: C.white,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  input: {
+    backgroundColor: C.surface2,
+    color: C.white,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 12,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  switchLabel: {
+    color: C.white,
+  },
+  listContent: {
+    marginTop: 16,
+  },
+  skeletonItem: {
+    marginBottom: 12,
+  },
+});

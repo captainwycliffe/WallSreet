@@ -1,17 +1,35 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+
+const C = {
+  white: '#FFFFFF',
+};
 
 interface SectionHeaderProps {
   title: string;
   action?: React.ReactNode;
-  className?: string;
+  style?: object;
 }
 
-export function SectionHeader({ title, action, className = '' }: SectionHeaderProps) {
+export function SectionHeader({ title, action, style }: SectionHeaderProps) {
   return (
-    <View className={`flex-row items-center justify-between mb-3 ${className}`}>
-      <Text className="text-white font-interSemiBold text-lg">{title}</Text>
+    <View style={[styles.container, style]}>
+      <Text style={styles.title}>{title}</Text>
       {action}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  title: {
+    color: C.white,
+    fontWeight: '600',
+    fontSize: 18,
+  },
+});

@@ -19,23 +19,13 @@ private:
    datetime m_last_position_update;
    int      m_update_interval_secs;
 
-   // Track reported positions to detect opens/closes
-   struct TrackPosition {
-      long     ticket;
-      string   poi_id;
-      bool     reported_open;
-      double   last_price;
-   };
-   TrackPosition m_positions[100];
-   int m_position_count;
-
    //--- HTTP helpers --------------------------------------------------------
    string BuildAuthHeader() {
       return "X-API-Key: " + m_api_key;
    }
 
    bool SendHTTPPost(const string endpoint, const string json_body, string &response) {
-      string url    = m_backend_url + endpoint;
+      string url     = m_backend_url + endpoint;
       string headers = "Content-Type: application/json\r\n" + BuildAuthHeader() + "\r\n";
       char   body[], result[];
       StringToCharArray(json_body, body, 0, StringLen(json_body));
@@ -45,7 +35,7 @@ private:
          if(m_debug) PrintFormat("[MT5Adapter] HTTP error: %d for %s", GetLastError(), url);
          return false;
       }
-      if(m_debug) PrintFormat("[MT5Adapter] POST %s → %d", endpoint, res);
+      if(m_debug) PrintFormat("[MT5Adapter] POST %s -> %d", endpoint, res);
       return (res >= 200 && res < 300);
    }
 
@@ -76,19 +66,22 @@ private:
    void SendHeartbeatInternal() {
       double balance  = AccountInfoDouble(ACCOUNT_BALANCE);
       double equity   = AccountInfoDouble(ACCOUNT_EQUITY);
+      double margin   = AccountInfoDouble(ACCOUNT_MARGIN);
+      double free_m   = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+      double open_pl  = equity - balance;
       int    positions = PositionsTotal();
 
       string json = StringFormat(
-         "{\"timestamp\":\"%s\",\"version\":\"1.0\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"open_positions\":%d}",
+         "{\"timestamp\":\"%s\",\"version\":\"1.4.2\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"margin\":%.2f,\"free_margin\":%.2f,\"open_pl\":%.2f,\"open_positions\":%d}",
          TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS),
-         balance, equity, positions
+         balance, equity, margin, free_m, open_pl, positions
       );
 
       string response;
       if(!SendHTTPPost("/api/mt5/heartbeat", json, response)) {
-         if(m_debug) Print("[MT5Adapter] Heartbeat failed");
+         if(m_debug) Print("[MT5Adapter] Heartbeat failed. Check backend URL / WebRequest permissions.");
       } else {
-         if(m_debug) Print("[MT5Adapter] ♥ Heartbeat OK");
+         if(m_debug) Print("[MT5Adapter] Heartbeat OK");
       }
    }
 
@@ -112,7 +105,7 @@ private:
          );
 
          string response;
-         SendHTTPPost("/api/mt5/position/update", json, response);
+         SendHTTPPost("/api/mt5/position/update?ticket=" + IntegerToString(ticket), json, response);
       }
    }
 
@@ -133,7 +126,6 @@ public:
       m_last_heartbeat       = 0;
       m_last_position_update = 0;
       m_update_interval_secs = 5;
-      m_position_count       = 0;
    }
 
    //+------------------------------------------------------------------+
@@ -141,11 +133,10 @@ public:
    //+------------------------------------------------------------------+
    bool Initialize() {
       Print("[MT5Adapter] Initializing...");
-      string response;
       // Send initial heartbeat to signal EA is online
       SendHeartbeatInternal();
       m_last_heartbeat = TimeCurrent();
-      Print("[MT5Adapter] ✓ Connected to backend: " + m_backend_url);
+      Print("[MT5Adapter] Connected to backend: " + m_backend_url);
       return true;
    }
 
@@ -170,13 +161,10 @@ public:
    //+------------------------------------------------------------------+
    void OnDeinit() {
       Print("[MT5Adapter] Deinitializing...");
-      // Last heartbeat will timeout → backend detects EA_OFFLINE
    }
 
    //+------------------------------------------------------------------+
    //| Report a POI to the backend                                      |
-   //| Call this when your EA identifies a new Point of Interest        |
-   //| Returns the backend POI ID (store this to link to positions)     |
    //+------------------------------------------------------------------+
    string ReportPOI(
       const string symbol,
@@ -224,14 +212,13 @@ public:
 
       string response;
       if(SendHTTPPost("/api/mt5/poi", json, response)) {
-         // Extract ID from response JSON (simple parse)
          int id_pos = StringFind(response, "\"id\":\"");
          if(id_pos >= 0) {
             int start = id_pos + 6;
             int end   = StringFind(response, "\"", start);
             if(end > start) {
                string poi_id = StringSubstr(response, start, end - start);
-               if(m_debug) PrintFormat("[MT5Adapter] 📍 POI reported: %s %s @ %.5f (ID: %s)", symbol, direction, entry_price, poi_id);
+               if(m_debug) PrintFormat("[MT5Adapter] POI reported: %s %s @ %.5f (ID: %s)", symbol, direction, entry_price, poi_id);
                return poi_id;
             }
          }
@@ -241,11 +228,10 @@ public:
 
    //+------------------------------------------------------------------+
    //| Report position open                                             |
-   //| Call this when your EA opens a trade                             |
    //+------------------------------------------------------------------+
    bool ReportPositionOpen(
       const long   ticket,
-      const string poi_id,        // From ReportPOI(), or "" if not linked
+      const string poi_id,
       const string symbol,
       const string direction,
       const double volume,
@@ -257,7 +243,7 @@ public:
          "{"
          "\"idempotency_key\":\"pos_open_%lld\","
          "\"poi_id\":\"%s\","
-         "\"ticket\":%lld,"
+         "\"mt5_ticket\":%lld,"
          "\"symbol\":\"%s\","
          "\"direction\":\"%s\","
          "\"volume\":%.2f,"
@@ -278,7 +264,7 @@ public:
 
       string response;
       if(SendHTTPPost("/api/mt5/position/open", json, response)) {
-         if(m_debug) PrintFormat("[MT5Adapter] 📈 Position reported: %s %s Ticket:%lld", symbol, direction, ticket);
+         if(m_debug) PrintFormat("[MT5Adapter] Position reported: %s %s Ticket:%lld", symbol, direction, ticket);
          return true;
       }
       return false;
@@ -286,7 +272,6 @@ public:
 
    //+------------------------------------------------------------------+
    //| Report position close                                            |
-   //| Call this when your EA detects a position was closed             |
    //+------------------------------------------------------------------+
    bool ReportPositionClose(
       const long   ticket,
@@ -294,7 +279,7 @@ public:
       const double profit,
       const double commission  = 0,
       const double swap        = 0,
-      const string close_reason = ""  // "TP_HIT", "SL_HIT", "MANUAL", "EA"
+      const string close_reason = ""
    ) {
       string json = StringFormat(
          "{"
@@ -314,8 +299,8 @@ public:
       );
 
       string response;
-      if(SendHTTPPost("/api/mt5/position/close", json, response)) {
-         if(m_debug) PrintFormat("[MT5Adapter] 📉 Position close reported: Ticket:%lld P/L:%.2f", ticket, profit);
+      if(SendHTTPPost("/api/mt5/position/close?ticket=" + IntegerToString(ticket), json, response)) {
+         if(m_debug) PrintFormat("[MT5Adapter] Position close reported: Ticket:%lld P/L:%.2f", ticket, profit);
          return true;
       }
       return false;
@@ -323,7 +308,6 @@ public:
 
    //+------------------------------------------------------------------+
    //| Auto-detect trade events from OnTradeTransaction                 |
-   //| Optional: call from EA's OnTradeTransaction() for auto-reporting |
    //+------------------------------------------------------------------+
    void OnTradeTransaction(
       const MqlTradeTransaction &trans,
@@ -336,8 +320,6 @@ public:
             long ticket = (long)trans.position;
             if(ticket > 0 && PositionSelectByTicket(ticket)) {
                string dir = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "BUY" : "SELL";
-               // Auto-report (without POI ID since we don't know it here)
-               // For POI-linked reporting, call ReportPositionOpen() manually after ReportPOI()
                ReportPositionOpen(
                   ticket, "",
                   PositionGetString(POSITION_SYMBOL),
@@ -350,20 +332,22 @@ public:
             }
          }
 
-         // Position closed (exit deal)
-         if(trans.deal_entry == DEAL_ENTRY_OUT || trans.deal_entry == DEAL_ENTRY_INOUT) {
-            long ticket = (long)trans.position;
-            double profit     = HistoryDealGetDouble(trans.deal, DEAL_PROFIT);
-            double commission = HistoryDealGetDouble(trans.deal, DEAL_COMMISSION);
-            double swap       = HistoryDealGetDouble(trans.deal, DEAL_SWAP);
-            double exit_price = HistoryDealGetDouble(trans.deal, DEAL_PRICE);
+         // Position closed (exit deal checked via deal history)
+         if(HistorySelect(TimeCurrent() - 60, TimeCurrent())) {
+            ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
+            if(entry_type == DEAL_ENTRY_OUT || entry_type == DEAL_ENTRY_INOUT) {
+               long ticket = (long)trans.position;
+               double profit     = HistoryDealGetDouble(trans.deal, DEAL_PROFIT);
+               double commission = HistoryDealGetDouble(trans.deal, DEAL_COMMISSION);
+               double swap       = HistoryDealGetDouble(trans.deal, DEAL_SWAP);
+               double exit_price = HistoryDealGetDouble(trans.deal, DEAL_PRICE);
 
-            // Determine close reason
-            string reason = "MANUAL";
-            if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_SL)) < 0.0001) reason = "SL_HIT";
-            if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_TP)) < 0.0001) reason = "TP_HIT";
+               string reason = "MANUAL";
+               if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_SL)) < 0.0001) reason = "SL_HIT";
+               if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_TP)) < 0.0001) reason = "TP_HIT";
 
-            ReportPositionClose(ticket, exit_price, profit, commission, swap, reason);
+               ReportPositionClose(ticket, exit_price, profit, commission, swap, reason);
+            }
          }
       }
    }

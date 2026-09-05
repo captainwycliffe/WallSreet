@@ -1,29 +1,36 @@
-import React from 'react';
-import { View, TouchableOpacity, ViewProps, TouchableOpacityProps } from 'react-native';
+import React from "react";
+import { View, TouchableOpacity, StyleSheet, ViewStyle } from "react-native";
 
-interface CardProps extends ViewProps {
+interface CardProps {
   padding?: boolean;
-  onPress?: TouchableOpacityProps['onPress'];
-  className?: string;
+  onPress?: () => void;
+  style?: ViewStyle;
   children: React.ReactNode;
 }
 
-export function Card({ padding = true, onPress, className = '', children, ...props }: CardProps) {
-  const baseClass = "bg-surface rounded-2xl border border-border overflow-hidden";
-  const paddingClass = padding ? "p-4" : "";
-  const combinedClass = `${baseClass} ${paddingClass} ${className}`;
+export function Card({ padding = true, onPress, style, children }: CardProps) {
+  const cardStyle = [styles.card, padding && styles.padded, style];
 
   if (onPress) {
     return (
-      <TouchableOpacity activeOpacity={0.8} onPress={onPress} className={combinedClass} {...(props as any)}>
+      <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={cardStyle}>
         {children}
       </TouchableOpacity>
     );
   }
 
-  return (
-    <View className={combinedClass} {...props}>
-      {children}
-    </View>
-  );
+  return <View style={cardStyle}>{children}</View>;
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#12121A",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#2A2A3A",
+    overflow: "hidden",
+  },
+  padded: {
+    padding: 16,
+  },
+});

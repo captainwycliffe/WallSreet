@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { Header } from '../../../components/ui/Header';
@@ -9,11 +9,21 @@ import { LoadingSkeleton } from '../../../components/common/LoadingSkeleton';
 import { ErrorState } from '../../../components/common/ErrorState';
 import { usePOI } from '../../../hooks/usePOIs';
 
+const C = {
+  bg: '#0A0A0F',
+  border: '#2A2A3A',
+  green: '#00C896',
+  red: '#FF4757',
+  cyan: '#00D4FF',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+};
+
 function Row({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <View className="flex-row justify-between items-center py-3 border-b border-border">
-      <Text className="text-textSecondary">{label}</Text>
-      <Text className={`font-interMedium ${color || 'text-white'}`}>{value}</Text>
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={[styles.rowValue, { color: color ?? C.white }]}>{value}</Text>
     </View>
   );
 }
@@ -23,11 +33,11 @@ export default function POIDetailScreen() {
   const { data: poi, isLoading, error, refetch } = usePOI(id);
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.safeArea}>
       <Header title={poi ? `${poi.symbol} · ${poi.direction}` : 'POI Detail'} subtitle={poi?.timeframe} />
-      <ScrollView className="flex-1 px-4">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {isLoading ? (
-          <View className="mt-4 space-y-4">
+          <View style={styles.skeletonWrapper}>
             <LoadingSkeleton height={200} />
           </View>
         ) : error && !poi ? (
@@ -36,17 +46,17 @@ export default function POIDetailScreen() {
           <ErrorState message="POI not found." />
         ) : (
           <>
-            <Card className="mt-4 mb-4">
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-white font-interSemiBold text-lg">{poi.poi_type.replace('_', ' ')}</Text>
+            <Card style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.poiType}>{poi.poi_type.replace('_', ' ')}</Text>
                 <StatusBadge status={poi.status} />
               </View>
               <Row label="Entry price" value={poi.entry_price.toFixed(5)} />
-              <Row label="Stop loss" value={poi.stop_loss.toFixed(5)} color="text-red" />
-              <Row label="Take profit" value={poi.take_profit.toFixed(5)} color="text-green" />
+              <Row label="Stop loss" value={poi.stop_loss.toFixed(5)} color={C.red} />
+              <Row label="Take profit" value={poi.take_profit.toFixed(5)} color={C.green} />
               <Row label="Zone high" value={poi.zone_high.toFixed(5)} />
               <Row label="Zone low" value={poi.zone_low.toFixed(5)} />
-              <Row label="Risk:Reward" value={`1:${poi.risk_reward.toFixed(1)}`} color="text-cyan" />
+              <Row label="Risk:Reward" value={`1:${poi.risk_reward.toFixed(1)}`} color={C.cyan} />
               <Row label="Detected" value={new Date(poi.created_at).toLocaleString()} />
               {poi.activated_at && <Row label="Activated" value={new Date(poi.activated_at).toLocaleString()} />}
               {poi.closed_at && <Row label="Closed" value={new Date(poi.closed_at).toLocaleString()} />}
@@ -54,7 +64,7 @@ export default function POIDetailScreen() {
 
             {poi.trade && (
               <>
-                <Text className="text-white font-interSemiBold text-lg mb-3">Resulting Trade</Text>
+                <Text style={styles.sectionTitle}>Resulting Trade</Text>
                 <TradeCard trade={poi.trade} />
               </>
             )}
@@ -64,3 +74,56 @@ export default function POIDetailScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  skeletonWrapper: {
+    marginTop: 16,
+  },
+  card: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  poiType: {
+    color: C.white,
+    fontWeight: '600',
+    fontSize: 18,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  rowLabel: {
+    color: C.textSecondary,
+  },
+  rowValue: {
+    color: C.white,
+    fontWeight: '500',
+  },
+  sectionTitle: {
+    color: C.white,
+    fontWeight: '600',
+    fontSize: 18,
+    marginBottom: 12,
+  },
+});

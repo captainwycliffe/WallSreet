@@ -1,11 +1,17 @@
-import { View, Text, Switch, Alert, ScrollView } from 'react-native';
+import { View, Text, Switch, Alert, ScrollView, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Header } from '../../../../components/ui/Header';
 import { Card } from '../../../../components/ui/Card';
 import { registerForPushNotifications } from '../../../../services/notifications';
 import { notificationsService } from '../../../../services/api';
-import { Platform } from 'react-native';
+
+const C = {
+  bg: '#0A0A0F',
+  green: '#00C896',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+};
 
 export default function SettingsScreen() {
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -37,14 +43,14 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.safeArea}>
       <Header title="Settings" subtitle="App preferences" />
-      <ScrollView className="flex-1 px-4">
-        <Card className="mt-4 mb-4">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1 mr-4">
-              <Text className="text-white font-interMedium">Push notifications</Text>
-              <Text className="text-textSecondary text-xs mt-1">
+      <ScrollView style={styles.scroll}>
+        <Card style={styles.cardFirst}>
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowTitle}>Push notifications</Text>
+              <Text style={styles.rowSubtitle}>
                 Get alerted when an EA goes offline or a trade closes
               </Text>
             </View>
@@ -52,16 +58,58 @@ export default function SettingsScreen() {
               value={pushEnabled}
               onValueChange={handleTogglePush}
               disabled={registering}
-              trackColor={{ true: '#00C896' }}
+              trackColor={{ true: C.green }}
             />
           </View>
         </Card>
 
         <Card>
-          <Text className="text-textSecondary text-xs">App version</Text>
-          <Text className="text-white font-interMedium mt-1">1.0.0</Text>
+          <Text style={styles.versionLabel}>App version</Text>
+          <Text style={styles.versionValue}>1.0.0</Text>
         </Card>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  cardFirst: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowText: {
+    flex: 1,
+    marginRight: 16,
+  },
+  rowTitle: {
+    color: C.white,
+    fontWeight: '500',
+  },
+  rowSubtitle: {
+    color: C.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  versionLabel: {
+    color: C.textSecondary,
+    fontSize: 12,
+  },
+  versionValue: {
+    color: C.white,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+});

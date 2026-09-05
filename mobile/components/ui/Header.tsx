@@ -1,7 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
+
+const C = {
+  white: '#FFFFFF',
+  border: '#2A2A3A',
+  textSecondary: '#8888A8',
+};
 
 interface HeaderProps {
   title: string;
@@ -12,15 +18,44 @@ interface HeaderProps {
 export function Header({ title, subtitle, right }: HeaderProps) {
   const router = useRouter();
   return (
-    <View className="flex-row items-center px-4 py-3 border-b border-border">
-      <TouchableOpacity onPress={() => router.back()} className="mr-2 p-1 -ml-1">
-        <ChevronLeft size={24} color="#FFFFFF" />
+    <View style={styles.container}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <ChevronLeft size={24} color={C.white} />
       </TouchableOpacity>
-      <View className="flex-1">
-        <Text className="text-white text-lg font-interSemiBold">{title}</Text>
-        {subtitle && <Text className="text-textSecondary text-xs mt-0.5">{subtitle}</Text>}
+      <View style={styles.titleBlock}>
+        <Text style={styles.title}>{title}</Text>
+        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
       </View>
       {right}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  backButton: {
+    marginRight: 8,
+    padding: 4,
+    marginLeft: -4,
+  },
+  titleBlock: {
+    flex: 1,
+  },
+  title: {
+    color: C.white,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  subtitle: {
+    color: C.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+});

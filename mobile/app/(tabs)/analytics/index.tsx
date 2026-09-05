@@ -1,17 +1,16 @@
-import { View, Text, ScrollView, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { BarChart3 } from 'lucide-react-native';
-import { MetricCard } from '../../../components/ui/MetricCard';
-import { Card } from '../../../components/ui/Card';
-import { EmptyState } from '../../../components/common/EmptyState';
-import { LoadingSkeleton } from '../../../components/common/LoadingSkeleton';
-import { useAnalyticsMetrics, useEquityCurve } from '../../../hooks/useAnalytics';
+import { View, Text, ScrollView, RefreshControl, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { BarChart3 } from "lucide-react-native";
+import { MetricCard } from "../../../components/ui/MetricCard";
+import { Card } from "../../../components/ui/Card";
+import { LoadingSkeleton } from "../../../components/common/LoadingSkeleton";
+import { useAnalyticsMetrics, useEquityCurve } from "../../../hooks/useAnalytics";
 
-// Lightweight bar-based equity sparkline built from plain Views. victory-native
-// v41's Skia-based charting API wasn't pulled in here — it's a large,
-// version-specific surface that couldn't be verified working in this
-// environment, and a simple guaranteed-correct visual beats an unverified
-// sophisticated one.
+const C = {
+  bg: "#0A0A0F", surface: "#12121A", border: "#2A2A3A",
+  white: "#FFFFFF", secondary: "#8888A8", green: "#00C896", red: "#FF4757",
+};
+
 function EquitySparkline({ points }: { points: { date: string; equity: number }[] }) {
   if (points.length === 0) return null;
   const values = points.map(p => p.equity);
@@ -20,17 +19,34 @@ function EquitySparkline({ points }: { points: { date: string; equity: number }[
   const range = max - min || 1;
 
   return (
-    <View className="flex-row items-end h-24 gap-1">
+    <View style={styles.sparklineRow}>
       {points.slice(-30).map((p, i) => {
         const heightPct = ((p.equity - min) / range) * 100;
         return (
           <View
             key={i}
-            className="flex-1 bg-green rounded-sm"
-            style={{ height: `${Math.max(heightPct, 4)}%`, opacity: 0.4 + (heightPct / 100) * 0.6 }}
+            style={[
+              styles.sparklineBar,
+              {
+                height: `${Math.max(heightPct, 4)}%` as any,
+                opacity: 0.4 + (heightPct / 100) * 0.6,
+              },
+            ]}
           />
         );
       })}
+    </View>
+  );
+}
+
+function EmptyAnalytics() {
+  return (
+    <View style={styles.emptyContainer}>
+      <BarChart3 size={48} color={C.secondary} />
+      <Text style={styles.emptyTitle}>No trades yet</Text>
+      <Text style={styles.emptySubtitle}>
+        Analytics will populate once you have closed trades.
+      </Text>
     </View>
   );
 }
@@ -40,72 +56,70 @@ export default function AnalyticsScreen() {
   const { data: equity } = useEquityCurve();
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <ScrollView
-        className="flex-1 px-4"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor="#00C896" />}
+        style={styles.scroll}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
+        showsVerticalScrollIndicator={false}
       >
-        <View className="mt-6 mb-4">
-          <Text className="text-white text-2xl font-interBold">Analytics</Text>
-          <Text className="text-textSecondary mt-1">Performance across all your trades</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>Analytics</Text>
+          <Text style={styles.subtitle}>Performance across all your trades</Text>
         </View>
 
         {isLoading ? (
-          <View className="space-y-4">
-            <LoadingSkeleton height={100} />
-            <LoadingSkeleton height={150} />
+          <View style={{ gap: 12 }}>
+            <LoadingSkeleton height={100} borderRadius={16} />
+            <LoadingSkeleton height={150} borderRadius={16} />
           </View>
         ) : !metrics || metrics.total_trades === 0 ? (
-          <EmptyState
-            icon={BarChart3}
-            title="No trades yet"
-            subtitle="Analytics will populate once you have closed trades."
-          />
+          <EmptyAnalytics />
         ) : (
           <>
             {equity && equity.equity_curve.length > 0 && (
-              <Card className="mb-4">
-                <Text className="text-textSecondary text-xs mb-1">Equity curve</Text>
-                <Text className="text-white text-xl font-interBold mb-3">
+              <Card style={styles.card}>
+                <Text style={styles.cardLabel}>Equity curve</Text>
+                <Text style={styles.equityValue}>
                   ${equity.equity_curve[equity.equity_curve.length - 1].equity.toFixed(2)}
                 </Text>
                 <EquitySparkline points={equity.equity_curve} />
               </Card>
             )}
 
-            <View className="flex-row flex-wrap gap-3 mb-4">
+            <View style={styles.metricsGrid}>
               <MetricCard label="Win Rate" value={`${(metrics.win_rate * 100).toFixed(1)}%`} />
               <MetricCard label="Total Trades" value={metrics.total_trades} />
               <MetricCard
                 label="Total P/L"
                 value={`$${metrics.total_net_pl.toFixed(2)}`}
-                color={metrics.total_net_pl >= 0 ? 'green' : 'red'}
+                color={metrics.total_net_pl >= 0 ? "green" : "red"}
               />
               <MetricCard label="Profit Factor" value={metrics.profit_factor.toFixed(2)} />
               <MetricCard
                 label="Expectancy"
                 value={metrics.expectancy.toFixed(2)}
-                color={metrics.expectancy >= 0 ? 'green' : 'red'}
+                color={metrics.expectancy >= 0 ? "green" : "red"}
               />
               <MetricCard label="Avg R" value={`${metrics.average_r.toFixed(2)}R`} />
               <MetricCard label="Max Drawdown" value={`${metrics.max_drawdown.toFixed(1)}%`} color="red" />
               <MetricCard label="Avg Win" value={`$${metrics.average_win.toFixed(2)}`} color="green" />
             </View>
 
-            <Card className="mb-8">
-              <Text className="text-white font-interSemiBold mb-3">Win / Loss breakdown</Text>
-              <View className="flex-row justify-between">
+            <Card style={[styles.card, { marginBottom: 0 }]}>
+              <Text style={styles.sectionTitle}>Win / Loss Breakdown</Text>
+              <View style={styles.breakdownRow}>
                 <View>
-                  <Text className="text-textSecondary text-xs">Winning trades</Text>
-                  <Text className="text-green font-interBold text-lg mt-1">{metrics.winning_trades}</Text>
+                  <Text style={styles.cardLabel}>Winning trades</Text>
+                  <Text style={[styles.breakdownValue, { color: C.green }]}>{metrics.winning_trades}</Text>
                 </View>
                 <View>
-                  <Text className="text-textSecondary text-xs">Losing trades</Text>
-                  <Text className="text-red font-interBold text-lg mt-1">{metrics.losing_trades}</Text>
+                  <Text style={styles.cardLabel}>Losing trades</Text>
+                  <Text style={[styles.breakdownValue, { color: C.red }]}>{metrics.losing_trades}</Text>
                 </View>
                 <View>
-                  <Text className="text-textSecondary text-xs">Avg loss</Text>
-                  <Text className="text-red font-interBold text-lg mt-1">${metrics.average_loss.toFixed(2)}</Text>
+                  <Text style={styles.cardLabel}>Avg loss</Text>
+                  <Text style={[styles.breakdownValue, { color: C.red }]}>${metrics.average_loss.toFixed(2)}</Text>
                 </View>
               </View>
             </Card>
@@ -115,3 +129,23 @@ export default function AnalyticsScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.bg },
+  scroll: { flex: 1, paddingHorizontal: 16 },
+  header: { marginTop: 24, marginBottom: 16 },
+  title: { color: C.white, fontSize: 24, fontWeight: "700" },
+  subtitle: { color: C.secondary, fontSize: 14, marginTop: 4 },
+  card: { marginBottom: 12 },
+  cardLabel: { color: C.secondary, fontSize: 12, marginBottom: 4 },
+  equityValue: { color: C.white, fontSize: 22, fontWeight: "700", marginBottom: 12 },
+  sparklineRow: { flexDirection: "row", alignItems: "flex-end", height: 96, gap: 2 },
+  sparklineBar: { flex: 1, backgroundColor: C.green, borderRadius: 2 },
+  metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
+  sectionTitle: { color: C.white, fontWeight: "600", fontSize: 15, marginBottom: 12 },
+  breakdownRow: { flexDirection: "row", justifyContent: "space-between" },
+  breakdownValue: { fontWeight: "700", fontSize: 20, marginTop: 4 },
+  emptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 64 },
+  emptyTitle: { color: C.white, fontSize: 18, fontWeight: "600", marginTop: 16 },
+  emptySubtitle: { color: C.secondary, fontSize: 14, marginTop: 8, textAlign: "center", paddingHorizontal: 24 },
+});

@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TextInput, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -9,6 +9,16 @@ import { Button } from '../../../../components/ui/Button';
 import { LoadingSkeleton } from '../../../../components/common/LoadingSkeleton';
 import { journalService } from '../../../../services/api';
 import { useTrade } from '../../../../hooks/useTrades';
+
+const C = {
+  bg: '#0A0A0F',
+  surface: '#12121A',
+  surface2: '#1C1C28',
+  border: '#2A2A3A',
+  green: '#00C896',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+};
 
 const RATINGS = [1, 2, 3, 4, 5];
 
@@ -25,6 +35,7 @@ export default function JournalEntryScreen() {
         return await journalService.getEntry(tradeId);
       } catch (e) {
         return null; // no entry yet — that's a normal, expected state here
+        return null;
       }
     },
   });
@@ -62,32 +73,36 @@ export default function JournalEntryScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.container}>
       <Header
         title={trade ? `${trade.symbol} · ${trade.direction}` : 'Journal Entry'}
         subtitle={trade ? `${(trade.profit || 0) >= 0 ? '+' : ''}$${trade.profit?.toFixed(2) ?? '0.00'} · ${trade.r_multiple?.toFixed(2) ?? '0.00'}R` : undefined}
       />
-      <ScrollView className="flex-1 px-4">
+      <ScrollView style={styles.scroll}>
         {isLoading ? (
-          <View className="mt-4"><LoadingSkeleton height={200} /></View>
+          <View style={styles.loadingContainer}>
+            <LoadingSkeleton height={200} />
+          </View>
         ) : (
-          <Card className="mt-4 mb-6">
-            <Text className="text-textSecondary text-xs mb-2">Rating</Text>
-            <View className="flex-row mb-4">
+          <Card style={styles.card}>
+            <Text style={styles.label}>Rating</Text>
+            <View style={styles.ratingRow}>
               {RATINGS.map((r) => (
-                <Text
+                <TouchableOpacity
                   key={r}
                   onPress={() => setRating(r === rating ? null : r)}
-                  className={`text-2xl mr-2 ${rating && r <= rating ? 'opacity-100' : 'opacity-30'}`}
+                  activeOpacity={0.7}
                 >
-                  ⭐
-                </Text>
+                  <Text style={[styles.star, rating && r <= rating ? styles.starActive : styles.starInactive]}>
+                    ⭐
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
 
-            <Text className="text-textSecondary text-xs mb-2">Notes</Text>
+            <Text style={styles.label}>Notes</Text>
             <TextInput
-              className="bg-surface2 text-white px-4 py-3 rounded-xl border border-border mb-4 min-h-[100px]"
+              style={[styles.input, styles.notesInput]}
               placeholder="What happened with this trade?"
               placeholderTextColor="#8888A8"
               multiline
@@ -96,9 +111,9 @@ export default function JournalEntryScreen() {
               onChangeText={setNotes}
             />
 
-            <Text className="text-textSecondary text-xs mb-2">Lessons learned</Text>
+            <Text style={styles.label}>Lessons learned</Text>
             <TextInput
-              className="bg-surface2 text-white px-4 py-3 rounded-xl border border-border mb-4 min-h-[80px]"
+              style={[styles.input, styles.lessonsInput]}
               placeholder="What would you do differently next time?"
               placeholderTextColor="#8888A8"
               multiline
@@ -114,3 +129,57 @@ export default function JournalEntryScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  loadingContainer: {
+    marginTop: 16,
+  },
+  card: {
+    marginTop: 16,
+    marginBottom: 24,
+    padding: 16,
+  },
+  label: {
+    color: C.textSecondary,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  star: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  starActive: {
+    opacity: 1,
+  },
+  starInactive: {
+    opacity: 0.3,
+  },
+  input: {
+    backgroundColor: C.surface2,
+    color: C.white,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 16,
+  },
+  notesInput: {
+    minHeight: 100,
+  },
+  lessonsInput: {
+    minHeight: 80,
+  },
+});

@@ -1,4 +1,4 @@
-import { View, ScrollView, RefreshControl } from 'react-native';
+import { View, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Bell } from 'lucide-react-native';
@@ -9,6 +9,11 @@ import { ErrorState } from '../../../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../../../components/common/LoadingSkeleton';
 import { notificationsService } from '../../../../services/api';
 
+const C = {
+  bg: '#0A0A0F',
+  green: '#00C896',
+};
+
 export default function NotificationsScreen() {
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['notificationHistory'],
@@ -16,17 +21,17 @@ export default function NotificationsScreen() {
   });
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.safeArea}>
       <Header title="Notifications" subtitle="Push alert history" />
       <ScrollView
-        className="flex-1 px-4"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor="#00C896" />}
+        style={styles.scroll}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
       >
-        <View className="mt-4">
+        <View style={styles.content}>
           {isLoading ? (
-            <View className="space-y-3">
-              <LoadingSkeleton height={80} />
-              <LoadingSkeleton height={80} />
+            <View>
+              <View style={styles.skeletonGap}><LoadingSkeleton height={80} /></View>
+              <View style={styles.skeletonGap}><LoadingSkeleton height={80} /></View>
             </View>
           ) : error ? (
             <ErrorState message="Couldn't load notifications." onRetry={refetch} />
@@ -44,3 +49,20 @@ export default function NotificationsScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  content: {
+    marginTop: 16,
+  },
+  skeletonGap: {
+    marginBottom: 12,
+  },
+});

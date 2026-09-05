@@ -34,7 +34,7 @@ class TradeService:
             
         trade = Trade(
             account_id=account_id,
-            poi_id=req.poi_id,
+            poi_id=req.poi_id if req.poi_id and len(req.poi_id) > 5 else None,
             mt5_ticket=req.mt5_ticket,
             symbol=req.symbol,
             direction=req.direction,

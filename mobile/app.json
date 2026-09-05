@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "scheme": "mt5monitor",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0A0F"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -28,10 +23,19 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0A0F"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     }
   }
 }
+

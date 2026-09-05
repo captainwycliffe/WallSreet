@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { BookOpen, ChevronRight } from 'lucide-react-native';
@@ -9,6 +9,15 @@ import { ErrorState } from '../../../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../../../components/common/LoadingSkeleton';
 import { useTrades } from '../../../../hooks/useTrades';
 
+const C = {
+  bg: '#0A0A0F',
+  green: '#00C896',
+  red: '#FF4757',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+  textMuted: '#555577',
+};
+
 export default function JournalIndexScreen() {
   const { data, isLoading, isFetching, error, refetch } = useTrades({ status: 'CLOSED' });
   const router = useRouter();
@@ -16,17 +25,17 @@ export default function JournalIndexScreen() {
   const closedTrades = data?.items.filter(t => t.status === 'CLOSED') ?? [];
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.safeArea}>
       <Header title="Trade Journal" subtitle="Add notes and lessons to your closed trades" />
       <ScrollView
-        className="flex-1 px-4"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor="#00C896" />}
+        style={styles.scroll}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
       >
-        <View className="mt-4">
+        <View style={styles.content}>
           {isLoading ? (
-            <View className="space-y-3">
-              <LoadingSkeleton height={70} />
-              <LoadingSkeleton height={70} />
+            <View>
+              <View style={styles.skeletonGap}><LoadingSkeleton height={70} /></View>
+              <View style={styles.skeletonGap}><LoadingSkeleton height={70} /></View>
             </View>
           ) : error ? (
             <ErrorState message="Couldn't load trades." onRetry={refetch} />
@@ -38,24 +47,24 @@ export default function JournalIndexScreen() {
             />
           ) : (
             closedTrades.map((trade) => {
-              const profitColor = (trade.profit || 0) >= 0 ? 'text-green' : 'text-red';
+              const profitColor = (trade.profit || 0) >= 0 ? C.green : C.red;
               return (
                 <TouchableOpacity
                   key={trade.id}
                   onPress={() => router.push(`/(tabs)/more/journal/${trade.id}` as any)}
                 >
-                  <Card className="mb-3 flex-row items-center justify-between">
-                    <View className="flex-1">
-                      <View className="flex-row items-center">
-                        <Text className="text-white font-interSemiBold mr-2">{trade.symbol}</Text>
-                        <Text className="text-textSecondary text-xs">{trade.direction}</Text>
+                  <Card style={styles.tradeCard}>
+                    <View style={styles.tradeInfo}>
+                      <View style={styles.tradeHeader}>
+                        <Text style={styles.tradeSymbol}>{trade.symbol}</Text>
+                        <Text style={styles.tradeDirection}>{trade.direction}</Text>
                       </View>
-                      <Text className={`${profitColor} font-interMedium text-sm mt-1`}>
+                      <Text style={[styles.tradeProfit, { color: profitColor }]}>
                         {(trade.profit || 0) >= 0 ? '+' : ''}${trade.profit?.toFixed(2) ?? '0.00'}
                         {trade.journal ? ' · Journaled' : ''}
                       </Text>
                     </View>
-                    <ChevronRight size={18} color="#555577" />
+                    <ChevronRight size={18} color={C.textMuted} />
                   </Card>
                 </TouchableOpacity>
               );
@@ -66,3 +75,47 @@ export default function JournalIndexScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  content: {
+    marginTop: 16,
+  },
+  skeletonGap: {
+    marginBottom: 12,
+  },
+  tradeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  tradeInfo: {
+    flex: 1,
+  },
+  tradeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tradeSymbol: {
+    color: C.white,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  tradeDirection: {
+    color: C.textSecondary,
+    fontSize: 12,
+  },
+  tradeProfit: {
+    fontWeight: '500',
+    fontSize: 14,
+    marginTop: 4,
+  },
+});

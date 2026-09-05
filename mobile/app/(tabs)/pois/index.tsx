@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Target } from 'lucide-react-native';
@@ -8,25 +8,36 @@ import { ErrorState } from '../../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../../components/common/LoadingSkeleton';
 import { usePOIs } from '../../../hooks/usePOIs';
 
+const C = {
+  bg: '#0A0A0F',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+  green: '#00C896',
+};
+
 export default function POIsScreen() {
   const { data, isLoading, isFetching, error, refetch } = usePOIs();
   const router = useRouter();
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.screen}>
       <ScrollView
-        className="flex-1 px-4"
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor="#00C896" />}
+        style={styles.scroll}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
       >
-        <View className="mt-6 mb-4">
-          <Text className="text-white text-2xl font-interBold">POIs</Text>
-          <Text className="text-textSecondary mt-1">Points of interest detected by your EA</Text>
+        <View style={styles.pageHeader}>
+          <Text style={styles.pageTitle}>POIs</Text>
+          <Text style={styles.pageSubtitle}>Points of interest detected by your EA</Text>
         </View>
 
         {isLoading ? (
-          <View className="space-y-4">
-            <LoadingSkeleton height={180} />
-            <LoadingSkeleton height={180} />
+          <View>
+            <View style={styles.skeletonItem}>
+              <LoadingSkeleton height={180} />
+            </View>
+            <View style={styles.skeletonItem}>
+              <LoadingSkeleton height={180} />
+            </View>
           </View>
         ) : error && !data ? (
           <ErrorState message="Couldn't load POIs." onRetry={refetch} />
@@ -45,3 +56,30 @@ export default function POIsScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  pageHeader: {
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  pageTitle: {
+    color: C.white,
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  pageSubtitle: {
+    color: C.textSecondary,
+    marginTop: 4,
+  },
+  skeletonItem: {
+    marginBottom: 16,
+  },
+});

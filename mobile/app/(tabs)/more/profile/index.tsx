@@ -1,37 +1,47 @@
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User } from 'lucide-react-native';
 import { Header } from '../../../../components/ui/Header';
 import { Card } from '../../../../components/ui/Card';
 import { useAuthStore } from '../../../../store/authStore';
 
+const C = {
+  bg: '#0A0A0F',
+  surface2: '#1C1C28',
+  border: '#2A2A3A',
+  green: '#00C896',
+  red: '#FF4757',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+};
+
 export default function ProfileScreen() {
   const { user } = useAuthStore();
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={styles.safeArea}>
       <Header title="Profile" />
-      <ScrollView className="flex-1 px-4">
-        <View className="items-center mt-8 mb-6">
-          <View className="w-20 h-20 bg-surface2 rounded-full items-center justify-center mb-3">
-            <User size={36} color="#00C896" />
+      <ScrollView style={styles.scroll}>
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarCircle}>
+            <User size={36} color={C.green} />
           </View>
-          <Text className="text-white text-xl font-interBold">{user?.username || '—'}</Text>
-          <Text className="text-textSecondary mt-1">{user?.email || '—'}</Text>
+          <Text style={styles.username}>{user?.username || '—'}</Text>
+          <Text style={styles.email}>{user?.email || '—'}</Text>
         </View>
 
         <Card padding={false}>
-          <View className="flex-row justify-between items-center px-4 py-4 border-b border-border">
-            <Text className="text-textSecondary">Username</Text>
-            <Text className="text-white font-interMedium">{user?.username || '—'}</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Username</Text>
+            <Text style={styles.infoValue}>{user?.username || '—'}</Text>
           </View>
-          <View className="flex-row justify-between items-center px-4 py-4 border-b border-border">
-            <Text className="text-textSecondary">Email</Text>
-            <Text className="text-white font-interMedium">{user?.email || '—'}</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Email</Text>
+            <Text style={styles.infoValue}>{user?.email || '—'}</Text>
           </View>
-          <View className="flex-row justify-between items-center px-4 py-4">
-            <Text className="text-textSecondary">Status</Text>
-            <Text className={`font-interMedium ${user?.is_active ? 'text-green' : 'text-red'}`}>
+          <View style={[styles.infoRow, styles.infoRowLast]}>
+            <Text style={styles.infoLabel}>Status</Text>
+            <Text style={[styles.infoValue, { color: user?.is_active ? C.green : C.red }]}>
               {user?.is_active ? 'Active' : 'Inactive'}
             </Text>
           </View>
@@ -40,3 +50,56 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scroll: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginTop: 32,
+    marginBottom: 24,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    backgroundColor: C.surface2,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  username: {
+    color: C.white,
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  email: {
+    color: C.textSecondary,
+    marginTop: 4,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  infoRowLast: {
+    borderBottomWidth: 0,
+  },
+  infoLabel: {
+    color: C.textSecondary,
+  },
+  infoValue: {
+    color: C.white,
+    fontWeight: '500',
+  },
+});

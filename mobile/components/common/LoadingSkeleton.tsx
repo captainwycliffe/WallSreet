@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence } from 'react-native-reanimated';
 
-export function LoadingSkeleton({ width = '100%', height = 20, borderRadius = 8, className = '' }) {
+export function LoadingSkeleton({ width = '100%', height = 20, borderRadius = 8 }: { width?: any; height?: number; borderRadius?: number }) {
   const opacity = useSharedValue(0.3);
 
   useEffect(() => {
@@ -21,9 +21,8 @@ export function LoadingSkeleton({ width = '100%', height = 20, borderRadius = 8,
   }));
 
   return (
-    <Animated.View 
-      style={[{ width, height, borderRadius, backgroundColor: '#2A2A3A' }, animatedStyle]} 
-      className={className}
+    <Animated.View
+      style={[{ width, height, borderRadius, backgroundColor: '#2A2A3A' }, animatedStyle]}
     />
   );
 }

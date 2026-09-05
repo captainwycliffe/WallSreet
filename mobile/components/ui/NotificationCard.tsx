@@ -1,8 +1,17 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Bell, CheckCircle2, XCircle } from 'lucide-react-native';
 import { Card } from './Card';
 import { NotificationRecord } from '../../services/api';
+
+const C = {
+  white: '#FFFFFF',
+  surface2: '#1C1C28',
+  green: '#00C896',
+  red: '#FF4757',
+  textSecondary: '#8888A8',
+  textMuted: '#555577',
+};
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -15,22 +24,62 @@ interface NotificationCardProps {
 
 export function NotificationCard({ notification }: NotificationCardProps) {
   return (
-    <Card className="mb-3 flex-row items-start">
-      <View className="w-9 h-9 bg-surface2 rounded-full items-center justify-center mr-3">
-        <Bell size={16} color="#00C896" />
+    <Card style={styles.card}>
+      <View style={styles.iconCircle}>
+        <Bell size={16} color={C.green} />
       </View>
-      <View className="flex-1">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-white font-interSemiBold flex-1" numberOfLines={1}>{notification.title}</Text>
+      <View style={styles.content}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>{notification.title}</Text>
           {notification.success ? (
-            <CheckCircle2 size={16} color="#00C896" />
+            <CheckCircle2 size={16} color={C.green} />
           ) : (
-            <XCircle size={16} color="#FF4757" />
+            <XCircle size={16} color={C.red} />
           )}
         </View>
-        <Text className="text-textSecondary text-sm mt-1">{notification.body}</Text>
-        <Text className="text-textMuted text-xs mt-2">{formatWhen(notification.sent_at)}</Text>
+        <Text style={styles.body}>{notification.body}</Text>
+        <Text style={styles.when}>{formatWhen(notification.sent_at)}</Text>
       </View>
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    backgroundColor: C.surface2,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  content: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  title: {
+    color: C.white,
+    fontWeight: '600',
+    flex: 1,
+  },
+  body: {
+    color: C.textSecondary,
+    fontSize: 14,
+    marginTop: 4,
+  },
+  when: {
+    color: C.textMuted,
+    fontSize: 12,
+    marginTop: 8,
+  },
+});

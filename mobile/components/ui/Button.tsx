@@ -1,50 +1,112 @@
 import React from 'react';
-import { TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   disabled?: boolean;
-  className?: string;
 }
 
-export function Button({ title, onPress, variant = 'primary', size = 'md', loading, disabled, className }: ButtonProps) {
-  const baseClass = "items-center justify-center rounded-xl flex-row";
-  
-  const variants = {
-    primary: "bg-green",
-    secondary: "bg-surface2 border border-border",
-    danger: "bg-red",
-    ghost: "bg-transparent",
-  };
-
-  const sizes = {
-    sm: "py-2 px-4",
-    md: "py-3 px-6",
-    lg: "py-4 px-8",
-  };
-
-  const textColors = {
-    primary: "text-black",
-    secondary: "text-white",
-    danger: "text-white",
-    ghost: "text-white",
-  };
+export function Button({
+  title,
+  onPress,
+  variant = 'primary',
+  size = 'md',
+  loading,
+  disabled,
+}: ButtonProps) {
+  const isDisabled = disabled || loading;
 
   return (
     <TouchableOpacity
       onPress={onPress}
-      disabled={disabled || loading}
-      className={`${baseClass} ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50' : ''} ${className}`}
+      disabled={isDisabled}
+      activeOpacity={0.75}
+      style={[
+        styles.base,
+        styles[`variant_${variant}`],
+        styles[`size_${size}`],
+        isDisabled && styles.disabled,
+      ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? 'black' : 'white'} />
+        <ActivityIndicator color={C.indicatorColor[variant]} />
       ) : (
-        <Text className={`${textColors[variant]} font-interSemiBold text-md`}>{title}</Text>
+        <Text style={[styles.label, styles[`labelColor_${variant}`]]}>{title}</Text>
       )}
     </TouchableOpacity>
   );
 }
+
+const C = {
+  green: '#00C896',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+  indicatorColor: {
+    primary: '#FFFFFF',
+    secondary: '#00C896',
+    ghost: '#8888A8',
+  } as Record<string, string>,
+};
+
+const styles = StyleSheet.create({
+  base: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    borderRadius: 14,
+    width: '100%',
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+
+  // Variants
+  variant_primary: {
+    backgroundColor: C.green,
+    borderWidth: 0,
+  },
+  variant_secondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: C.green,
+  },
+  variant_ghost: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+
+  // Sizes
+  size_sm: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  size_md: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  size_lg: {
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+  },
+
+  // Label base
+  label: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Label colors per variant
+  labelColor_primary: {
+    color: C.white,
+  },
+  labelColor_secondary: {
+    color: C.green,
+  },
+  labelColor_ghost: {
+    color: C.textSecondary,
+  },
+});

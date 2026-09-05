@@ -51,6 +51,22 @@ class ConnectionManager:
             self._redis_subscribe_loop(), name="ws_redis_listener"
         )
         logger.info("WebSocket manager started with Redis pub/sub")
+        """Try to connect to Redis. Silently degrade to in-memory mode on failure."""
+        try:
+            redis = Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=2)
+            await redis.ping()
+            self._redis = redis
+            self._pubsub_task = asyncio.create_task(
+                self._redis_subscribe_loop(), name="ws_redis_listener"
+            )
+            logger.info("WebSocket manager started with Redis pub/sub (%s)", settings.REDIS_URL)
+        except Exception as e:
+            self._redis = None
+            logger.warning(
+                "Redis unavailable (%s) — WebSocket manager running in single-process "
+                "in-memory mode. Real-time delivery still works for this worker.", e
+            )
+
 
     async def shutdown(self):
         """Stop Redis listener. Call on application shutdown."""
@@ -125,6 +141,8 @@ class ConnectionManager:
         """
         Publish a message to all users of an account via Redis.
         Works across multiple backend workers.
+        Publish a message to all users of an account.
+        Uses Redis when available; falls back to direct in-process delivery.
         """
         if not self._redis:
             return
@@ -134,6 +152,15 @@ class ConnectionManager:
             await self._redis.publish(channel, payload)
         except Exception as e:
             logger.error("Redis publish error for account %s: %s", account_id, e)
+        if self._redis:
+            channel = f"{ACCOUNT_CHANNEL_PREFIX}{account_id}"
+            try:
+                await self._redis.publish(channel, message.model_dump_json())
+                return
+            except Exception as e:
+                logger.warning("Redis publish error for account %s, falling back: %s", account_id, e)
+        # In-process fallback — works on single-worker / no-Redis setups
+        await self._forward_to_account_users(account_id, message)
 
     async def publish_to_user(self, user_id: str, message: WSMessage):
         """Publish a message to a specific user via Redis."""
@@ -145,6 +172,19 @@ class ConnectionManager:
             await self._redis.publish(channel, payload)
         except Exception as e:
             logger.error("Redis publish error for user %s: %s", user_id, e)
+        """
+        Publish a message to a specific user.
+        Uses Redis when available; falls back to direct in-process delivery.
+        """
+        if self._redis:
+            channel = f"{USER_CHANNEL_PREFIX}{user_id}"
+            try:
+                await self._redis.publish(channel, message.model_dump_json())
+                return
+            except Exception as e:
+                logger.warning("Redis publish error for user %s, falling back: %s", user_id, e)
+        # In-process fallback
+        await self.send_to_user(user_id, message)
 
     # ─── Redis subscriber loop ────────────────────────────────────────────────
 

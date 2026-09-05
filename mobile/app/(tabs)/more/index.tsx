@@ -1,11 +1,10 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   BookOpen, ShieldAlert, Wallet, Cpu, Bell, Settings, User, LogOut, ChevronRight,
 } from 'lucide-react-native';
 import { useAuthStore } from '../../../store/authStore';
-import { Card } from '../../../components/ui/Card';
 
 interface MenuItem {
   icon: typeof BookOpen;
@@ -29,40 +28,143 @@ export default function MoreScreen() {
   const router = useRouter();
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <ScrollView className="flex-1 px-4">
-        <View className="mt-6 mb-6">
-          <Text className="text-white text-2xl font-interBold">More</Text>
-          {user && <Text className="text-textSecondary mt-1">{user.username} · {user.email}</Text>}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>More</Text>
+          {user && (
+            <Text style={styles.headerSubtitle}>{user.username} · {user.email}</Text>
+          )}
         </View>
 
-        <Card padding={false} className="mb-6">
+        {/* Menu Card */}
+        <View style={styles.menuCard}>
           {menuItems.map((item, i) => (
             <TouchableOpacity
               key={item.href}
               onPress={() => router.push(item.href as any)}
-              className={`flex-row items-center px-4 py-4 ${i < menuItems.length - 1 ? 'border-b border-border' : ''}`}
+              style={[
+                styles.menuRow,
+                i < menuItems.length - 1 && styles.menuRowBorder,
+              ]}
             >
-              <View className="w-9 h-9 bg-surface2 rounded-full items-center justify-center mr-3">
+              <View style={styles.iconBox}>
                 <item.icon size={18} color="#00C896" />
               </View>
-              <View className="flex-1">
-                <Text className="text-white font-interMedium">{item.label}</Text>
-                <Text className="text-textSecondary text-xs mt-0.5">{item.subtitle}</Text>
+              <View style={styles.menuTextGroup}>
+                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
               </View>
               <ChevronRight size={18} color="#555577" />
             </TouchableOpacity>
           ))}
-        </Card>
+        </View>
 
-        <TouchableOpacity
-          onPress={logout}
-          className="flex-row items-center justify-center bg-surface2 border border-border py-3.5 rounded-xl mb-8"
-        >
+        {/* Logout Button */}
+        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
           <LogOut size={16} color="#FF4757" />
-          <Text className="text-red font-interSemiBold ml-2">Log Out</Text>
+          <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const C = {
+  bg: '#0A0A0F',
+  surface: '#12121A',
+  surface2: '#1C1C28',
+  border: '#2A2A3A',
+  green: '#00C896',
+  red: '#FF4757',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+  textMuted: '#555577',
+};
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  header: {
+    marginTop: 24,
+    marginBottom: 24,
+  },
+  headerTitle: {
+    color: C.white,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    color: C.textSecondary,
+    fontSize: 14,
+    marginTop: 4,
+  },
+  menuCard: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 48,
+  },
+  menuRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    backgroundColor: C.surface2,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  menuTextGroup: {
+    flex: 1,
+  },
+  menuLabel: {
+    color: C.white,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  menuSubtitle: {
+    color: C.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 32,
+  },
+  logoutText: {
+    color: C.red,
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+});

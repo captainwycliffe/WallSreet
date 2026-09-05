@@ -1,4 +1,4 @@
-import { Slot, Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
@@ -13,6 +13,12 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
+  // SDK 57 / RN 0.86 fix: navigation must not be called before the root
+  // navigation container has mounted. useRootNavigationState().key is
+  // undefined until the navigator is ready.
+  const navigationState = useRootNavigationState();
+  const navigationReady = !!navigationState?.key;
+
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -25,7 +31,8 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (isLoading || !fontsLoaded) return;
+    // Wait until the nav root is mounted, fonts are loaded, and auth is resolved
+    if (!navigationReady || isLoading || !fontsLoaded) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
@@ -34,10 +41,10 @@ export default function RootLayout() {
     } else if (isAuthenticated && inAuthGroup) {
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, segments, isLoading, fontsLoaded]);
+  }, [navigationReady, isAuthenticated, segments, isLoading, fontsLoaded]);
 
   if (!fontsLoaded || isLoading) {
-    return null; // Or a splash screen
+    return null;
   }
 
   return (
@@ -50,3 +57,4 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+

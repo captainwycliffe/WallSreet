@@ -1,8 +1,16 @@
-import { View, Text, TextInput, Alert } from 'react-native';
+import { View, Text, TextInput, Alert, StyleSheet } from 'react-native';
 import { useState } from 'react';
 import { useRouter, Link } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../../components/ui/Button';
+
+const C = {
+  bg: '#0A0A0F',
+  surface2: '#1C1C28',
+  border: '#2A2A3A',
+  white: '#FFFFFF',
+  textSecondary: '#8888A8',
+};
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -40,42 +48,42 @@ export default function RegisterScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background justify-center px-6">
-      <View className="items-center mb-10">
-        <Text className="text-white text-3xl font-interBold">Create Account</Text>
-        <Text className="text-textSecondary mt-2">Set up your MT5 Monitor account</Text>
+    <View style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Create Account</Text>
+        <Text style={styles.subtitle}>Set up your MT5 Monitor account</Text>
       </View>
 
-      <View className="space-y-4">
+      <View>
         <TextInput
-          className="bg-surface2 text-white px-4 py-4 rounded-xl border border-border"
+          style={styles.input}
           placeholder="Email"
-          placeholderTextColor="#8888A8"
+          placeholderTextColor={C.textSecondary}
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
         />
         <TextInput
-          className="bg-surface2 text-white px-4 py-4 rounded-xl border border-border"
+          style={styles.input}
           placeholder="Username"
-          placeholderTextColor="#8888A8"
+          placeholderTextColor={C.textSecondary}
           autoCapitalize="none"
           value={username}
           onChangeText={setUsername}
         />
         <TextInput
-          className="bg-surface2 text-white px-4 py-4 rounded-xl border border-border"
+          style={styles.input}
           placeholder="Password"
-          placeholderTextColor="#8888A8"
+          placeholderTextColor={C.textSecondary}
           secureTextEntry
           value={password}
           onChangeText={setPassword}
         />
         <TextInput
-          className="bg-surface2 text-white px-4 py-4 rounded-xl border border-border mb-6"
+          style={[styles.input, styles.inputLast]}
           placeholder="Confirm password"
-          placeholderTextColor="#8888A8"
+          placeholderTextColor={C.textSecondary}
           secureTextEntry
           value={confirmPassword}
           onChangeText={setConfirmPassword}
@@ -90,3 +98,38 @@ export default function RegisterScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: C.bg,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  title: {
+    color: C.white,
+    fontSize: 30,
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    color: C.textSecondary,
+    marginTop: 8,
+  },
+  input: {
+    backgroundColor: C.surface2,
+    color: C.white,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 16,
+  },
+  inputLast: {
+    marginBottom: 24,
+  },
+});
