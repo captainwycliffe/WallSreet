@@ -26,7 +26,6 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # ─── Databento config ─────────────────────────────────────────────────────────
-_DATABENTO_API_KEY = os.getenv("DATABENTO_API_KEY", "")
 _DATABENTO_BASE = "https://hist.databento.com/v0"
 _DATASET = "GLBX.MDP3"        # CME Globex MDP 3.0
 
@@ -41,9 +40,28 @@ _CFTC_BASE = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
 _CFTC_GOLD_MARKET = "GOLD - COMMODITY EXCHANGE INC."
 
 
+def _get_databento_api_key() -> str:
+    """Retrieve Databento API key from app settings, environment, or .env."""
+    try:
+        from app.core.config import settings
+        if settings.DATABENTO_API_KEY:
+            return settings.DATABENTO_API_KEY
+    except Exception:
+        pass
+    env_val = os.getenv("DATABENTO_API_KEY")
+    if env_val:
+        return env_val
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        return os.getenv("DATABENTO_API_KEY", "")
+    except Exception:
+        return ""
+
+
 def _databento_auth() -> dict[str, str]:
     """Return Authorization header for Databento Basic auth."""
-    key = _DATABENTO_API_KEY or os.getenv("DATABENTO_API_KEY", "")
+    key = _get_databento_api_key()
     if not key:
         raise ValueError("DATABENTO_API_KEY environment variable is not set")
     raw = f"{key}:"

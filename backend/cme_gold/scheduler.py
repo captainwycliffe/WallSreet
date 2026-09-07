@@ -1,4 +1,4 @@
-﻿"""
+"""
 APScheduler-based background polling for CME Gold data.
 
 * Databento quote  — polled every QUOTE_INTERVAL_MINUTES  (default: 5)
@@ -20,8 +20,13 @@ from cme_gold import cache, client
 
 logger = logging.getLogger(__name__)
 
-QUOTE_INTERVAL_MINUTES = int(os.getenv("GOLD_QUOTE_INTERVAL_MINUTES", "5"))
-COT_INTERVAL_HOURS = int(os.getenv("GOLD_COT_INTERVAL_HOURS", "6"))
+try:
+    from app.core.config import settings
+    QUOTE_INTERVAL_MINUTES = settings.GOLD_QUOTE_INTERVAL_MINUTES
+    COT_INTERVAL_HOURS = settings.GOLD_COT_INTERVAL_HOURS
+except Exception:
+    QUOTE_INTERVAL_MINUTES = int(os.getenv("GOLD_QUOTE_INTERVAL_MINUTES", "5"))
+    COT_INTERVAL_HOURS = int(os.getenv("GOLD_COT_INTERVAL_HOURS", "6"))
 
 _scheduler: AsyncIOScheduler | None = None
 
