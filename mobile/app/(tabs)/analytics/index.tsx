@@ -1,4 +1,3 @@
-import { View, Text, ScrollView, RefreshControl, StyleSheet } from "react-native";
 import React, { useState } from "react";
 import { View, Text, ScrollView, RefreshControl, StyleSheet, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,12 +13,6 @@ const C = {
   white: "#FFFFFF", secondary: "#8888A8", green: "#00C896", red: "#FF4757",
 };
 
-function EquitySparkline({ points }: { points: { date: string; equity: number }[] }) {
-  if (points.length === 0) return null;
-  const values = points.map(p => p.equity);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
 function EquityLineGraph({ points }: { points: { date: string; equity: number }[] }) {
   const [width, setWidth] = useState(Dimensions.get("window").width - 64);
   if (!points || points.length === 0) return null;
@@ -64,22 +57,6 @@ function EquityLineGraph({ points }: { points: { date: string; equity: number }[
   const lastCoord = coords[coords.length - 1];
 
   return (
-    <View style={styles.sparklineRow}>
-      {points.slice(-30).map((p, i) => {
-        const heightPct = ((p.equity - min) / range) * 100;
-        return (
-          <View
-            key={i}
-            style={[
-              styles.sparklineBar,
-              {
-                height: `${Math.max(heightPct, 4)}%` as any,
-                opacity: 0.4 + (heightPct / 100) * 0.6,
-              },
-            ]}
-          />
-        );
-      })}
     <View
       style={styles.graphWrapper}
       onLayout={(e) => {
@@ -198,11 +175,6 @@ export default function AnalyticsScreen() {
           <>
             {equity && equity.equity_curve.length > 0 && (
               <Card style={styles.card}>
-                <Text style={styles.cardLabel}>Equity curve</Text>
-                <Text style={styles.equityValue}>
-                  ${equity.equity_curve[equity.equity_curve.length - 1].equity.toFixed(2)}
-                </Text>
-                <EquitySparkline points={equity.equity_curve} />
                 <View style={styles.cardHeaderRow}>
                   <View>
                     <Text style={styles.cardLabel}>Equity Curve</Text>
@@ -267,9 +239,6 @@ const styles = StyleSheet.create({
   card: { marginBottom: 12 },
   cardHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   cardLabel: { color: C.secondary, fontSize: 12, marginBottom: 4 },
-  equityValue: { color: C.white, fontSize: 22, fontWeight: "700", marginBottom: 12 },
-  sparklineRow: { flexDirection: "row", alignItems: "flex-end", height: 96, gap: 2 },
-  sparklineBar: { flex: 1, backgroundColor: C.green, borderRadius: 2 },
   equityValue: { color: C.white, fontSize: 24, fontWeight: "800", marginBottom: 8 },
   graphWrapper: { position: "relative", marginTop: 8 },
   benchmarkOverlay: {
