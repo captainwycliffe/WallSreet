@@ -1,4 +1,4 @@
-﻿"""
+"""
 In-memory cache for Gold quote and COT positioning.
 
 A simple dict-based cache with timestamp tracking and stale-flag logic.
@@ -52,3 +52,34 @@ async def get_positioning() -> Optional[dict]:
         age = _now() - _timestamps["positioning"]
         data["stale"] = age > _POSITIONING_TTL
         return data
+
+
+_VOL2VOL_TTL = timedelta(minutes=15)
+_OI_PROFILE_TTL = timedelta(hours=6)
+
+
+async def set_vol2vol(data: dict) -> None:
+    async with _lock:
+        _store["vol2vol"] = data
+        _timestamps["vol2vol"] = _now()
+
+
+async def get_vol2vol() -> Optional[dict]:
+    async with _lock:
+        if "vol2vol" not in _store:
+            return None
+        return dict(_store["vol2vol"])
+
+
+async def set_oi_profile(data: dict) -> None:
+    async with _lock:
+        _store["oi_profile"] = data
+        _timestamps["oi_profile"] = _now()
+
+
+async def get_oi_profile() -> Optional[dict]:
+    async with _lock:
+        if "oi_profile" not in _store:
+            return None
+        return dict(_store["oi_profile"])
+

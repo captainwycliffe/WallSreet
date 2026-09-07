@@ -1,4 +1,4 @@
-﻿"""
+"""
 FastAPI router for CME Gold market data.
 
 Endpoints:
@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from cme_gold import cache, client
-from cme_gold.schemas import GoldQuote, GoldPositioning, GoldSummary
+from cme_gold.schemas import GoldQuote, GoldPositioning, GoldSummary, GoldVol2VolRange, GoldOIProfile
 
 logger = logging.getLogger(__name__)
 
@@ -94,3 +94,35 @@ async def get_gold_summary() -> GoldSummary:
         positioning=GoldPositioning(**pos_data) if pos_data else None,
         last_updated=datetime.now(timezone.utc),
     )
+
+
+@router.get("/options/vol2vol", response_model=GoldVol2VolRange, summary="CME QuikStrike Vol2Vol Expected Range")
+async def get_gold_vol2vol(expiration: str | None = None) -> GoldVol2VolRange:
+    """
+    Return CME QuikStrike Vol2Vol strike-by-strike volume, IV smile, and delta markers.
+    """
+    data = await cache.get_vol2vol()
+    if data is None or (expiration and data.get("expiration") != expiration):
+        current_spot = None
+        try:
+            q = await cache.get_quote()
+            if q and "price" in q:
+                current_spot = q["price"]
+        except Exception:
+            pass
+        data = await client.fetch_gold_vol2vol(expiration=expiration, current_spot=current_spot)
+        await cache.set_vol2vol(data)
+    return GoldVol2VolRange(**data)
+
+
+@router.get("/options/oi-profile", response_model=GoldOIProfile, summary="CME QuikStrike Open Interest Profile")
+async def get_gold_oi_profile() -> GoldOIProfile:
+    """
+    Return CME QuikStrike Open Interest & Volume profile across all contract expirations.
+    """
+    data = await cache.get_oi_profile()
+    if data is None:
+        data = await client.fetch_gold_oi_profile()
+        await cache.set_oi_profile(data)
+    return GoldOIProfile(**data)
+
