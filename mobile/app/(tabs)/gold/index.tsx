@@ -134,12 +134,12 @@ async function fetchOIProfile(): Promise<OIProfileData> {
 }
 
 function fmtPrice(n: number) {
-  if (n == null || isNaN(n)) return 'ó';
+  if (n == null || isNaN(n)) return 'ÔøΩ';
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtNum(n: number) {
-  if (n == null || isNaN(n)) return 'ó';
+  if (n == null || isNaN(n)) return 'ÔøΩ';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toString();
@@ -242,20 +242,10 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
           <View style={[styles.legendDash, { backgroundColor: C.volRed, marginLeft: 10 }]} />
           <Text style={styles.legendText}>Vol Settle</Text>
         </View>
-        <Text style={styles.chartUnitText}>QuikStrike? Vol2Vol?</Text>
-        <Text style={styles.chartUnitText}>QuikStrike¬Æ Vol2Vol‚Ñ¢</Text>
+        <Text style={styles.chartUnitText}>QuikStrike Vol2Vol</Text>
       </View>
 
-      <Svg width={chartW} height={chartHeight}>
-        <Rect
-          x={expLowX}
-          y={padTop}
-          width={Math.max(expHighX - expLowX, 10)}
-          height={chartHeight - padTop - padBottom}
-          fill="#1C2030"
-          opacity={0.6}
-        />
-      {/* Zoom & Range Toolbar (Just like CME Group tool) */}
+      {/* Zoom & Range Toolbar */}
       <View style={styles.zoomToolbar}>
         <View style={styles.filterGroup}>
           <TouchableOpacity
@@ -283,19 +273,6 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
             </Text>
           </TouchableOpacity>
         </View>
-
-        {data.delta_zones.map((dz, i) => {
-          const x = xForStrike(dz.strike);
-          return (
-            <G key={i}>
-              <Line
-                x1={x}
-                y1={padTop - 8}
-                x2={x}
-                y2={chartHeight - padBottom}
-                stroke="#2A2A40"
-                strokeDasharray="2, 3"
-                strokeWidth={1}
         <View style={styles.zoomControls}>
           <TouchableOpacity style={styles.zoomIconBtn} onPress={handleZoomOut}>
             <ZoomOut size={16} color={zoomLevel > 1.0 ? C.white : C.dim} />
@@ -309,7 +286,7 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
         </View>
       </View>
 
-      {/* Scrollable Horizontal Chart Container for Zoom */}
+      {/* Scrollable Horizontal Chart Container */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={zoomLevel > 1.0}
@@ -317,7 +294,7 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
       >
         <View>
           <Svg width={chartW} height={chartHeight}>
-            {/* Shaded 1-Sigma Expected Range Band */}
+            {/* 1-Sigma Expected Range Band */}
             {expLowX < chartW && expHighX > 0 && (
               <Rect
                 x={Math.max(expLowX, padLeft)}
@@ -327,142 +304,37 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
                 fill="#171A29"
                 opacity={0.7}
               />
-              <SvgText
-                x={x}
-                y={padTop - 12}
-                fontSize={9}
-                fill={C.dim}
-                textAnchor="middle"
-                fontWeight="600"
-              >
-                {dz.label}
-              </SvgText>
-            </G>
-          );
-        })}
             )}
 
-        {strikes.map((s, idx) => {
-          const x = xForStrike(s.strike);
-          const barW = Math.max((chartW - padLeft - padRight) / strikes.length - 2, 4);
             {/* Horizontal Gridlines */}
-            <Line
-              x1={padLeft}
-              y1={padTop}
-              x2={chartW - padRight}
-              y2={padTop}
-              stroke="#1C1C2C"
-              strokeWidth={1}
-            />
-            <Line
-              x1={padLeft}
-              y1={chartHeight / 2}
-              x2={chartW - padRight}
-              y2={chartHeight / 2}
-              stroke="#1C1C2C"
-              strokeWidth={1}
-            />
-            <Line
-              x1={padLeft}
-              y1={chartHeight - padBottom}
-              x2={chartW - padRight}
-              y2={chartHeight - padBottom}
-              stroke="#2A2A3A"
-              strokeWidth={1.2}
-            />
+            <Line x1={padLeft} y1={padTop} x2={chartW - padRight} y2={padTop} stroke="#1C1C2C" strokeWidth={1} />
+            <Line x1={padLeft} y1={chartHeight / 2} x2={chartW - padRight} y2={chartHeight / 2} stroke="#1C1C2C" strokeWidth={1} />
+            <Line x1={padLeft} y1={chartHeight - padBottom} x2={chartW - padRight} y2={chartHeight - padBottom} stroke="#2A2A3A" strokeWidth={1.2} />
 
-          return (
-            <G key={idx}>
-              {s.put_volume > 0 && (
-                <Rect
-                  x={x - barW / 2}
-                  y={yForVolume(s.put_volume)}
-                  width={barW}
-                  height={chartHeight - padBottom - yForVolume(s.put_volume)}
-                  fill={C.putYellow}
-                  rx={2}
-                />
-              )}
-              {s.call_volume > 0 && (
-                <Rect
-                  x={x - barW / 2}
-                  y={yForVolume(s.call_volume)}
-                  width={barW}
-                  height={chartHeight - padBottom - yForVolume(s.call_volume)}
-                  fill={C.callBlue}
-                  rx={2}
-                />
-              )}
-            </G>
-          );
-        })}
             {/* Delta Zone Guideline Markers */}
             {data.delta_zones.map((dz, i) => {
               if (dz.strike < minStrike || dz.strike > maxStrike) return null;
               const x = xForStrike(dz.strike);
               return (
                 <G key={i}>
-                  <Line
-                    x1={x}
-                    y1={padTop - 8}
-                    x2={x}
-                    y2={chartHeight - padBottom}
-                    stroke="#2A2A40"
-                    strokeDasharray="2, 3"
-                    strokeWidth={1}
-                  />
-                  <SvgText
-                    x={x}
-                    y={padTop - 12}
-                    fontSize={10}
-                    fill={C.dim}
-                    textAnchor="middle"
-                    fontWeight="600"
-                  >
+                  <Line x1={x} y1={padTop - 8} x2={x} y2={chartHeight - padBottom} stroke="#2A2A40" strokeDasharray="2, 3" strokeWidth={1} />
+                  <SvgText x={x} y={padTop - 12} fontSize={10} fill={C.dim} textAnchor="middle" fontWeight="600">
                     {dz.label}
                   </SvgText>
                 </G>
               );
             })}
 
-        <Path
-          d={volCurveD}
-          fill="none"
-          stroke={C.volRed}
-          strokeWidth={2}
-          strokeDasharray="4, 3"
-        />
             {/* Histogram Volume Bars */}
             {strikes.map((s, idx) => {
               const x = xForStrike(s.strike);
               const slotWidth = (chartW - padLeft - padRight) / strikes.length;
               const barW = Math.max(slotWidth * 0.55, 6);
-
-        <Line
-          x1={spotX}
-          y1={padTop}
-          x2={spotX}
-          y2={chartHeight - padBottom}
-          stroke="#FFFFFF"
-          strokeDasharray="3, 2"
-          strokeWidth={1.5}
-        />
               const isMajorPut = s.put_volume >= 150;
               const isMajorCall = s.call_volume >= 150;
 
-        <SvgText
-          x={spotX}
-          y={chartHeight - padBottom + 16}
-          fontSize={10}
-          fill={C.white}
-          fontWeight="bold"
-          textAnchor="middle"
-        >
-          {data.spot_price.toFixed(1)}
-        </SvgText>
               return (
                 <G key={idx}>
-                  {/* Put Volume Bar (Yellow) */}
                   {s.put_volume > 0 && (
                     <>
                       <Rect
@@ -473,32 +345,13 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
                         fill={C.putYellow}
                         rx={3}
                       />
-                      {/* Volume numbers on major bars */}
                       {isMajorPut && (
-                        <SvgText
-                          x={x}
-                          y={yForVolume(s.put_volume) - 4}
-                          fontSize={9}
-                          fill={C.putYellow}
-                          fontWeight="700"
-                          textAnchor="middle"
-                        >
+                        <SvgText x={x} y={yForVolume(s.put_volume) - 4} fontSize={9} fill={C.putYellow} fontWeight="700" textAnchor="middle">
                           {s.put_volume}
                         </SvgText>
                       )}
                     </>
                   )}
-
-        <SvgText x={4} y={padTop + 6} fontSize={8} fill={C.secondary}>
-          400
-        </SvgText>
-        <SvgText x={4} y={chartHeight / 2} fontSize={8} fill={C.secondary}>
-          200
-        </SvgText>
-        <SvgText x={4} y={chartHeight - padBottom} fontSize={8} fill={C.secondary}>
-          0
-        </SvgText>
-                  {/* Call Volume Bar (Blue) */}
                   {s.call_volume > 0 && (
                     <>
                       <Rect
@@ -509,41 +362,14 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
                         fill={C.callBlue}
                         rx={3}
                       />
-                      {/* Volume numbers on major bars */}
                       {isMajorCall && (
-                        <SvgText
-                          x={x}
-                          y={yForVolume(s.call_volume) - 4}
-                          fontSize={9}
-                          fill={C.callBlue}
-                          fontWeight="700"
-                          textAnchor="middle"
-                        >
+                        <SvgText x={x} y={yForVolume(s.call_volume) - 4} fontSize={9} fill={C.callBlue} fontWeight="700" textAnchor="middle">
                           {s.call_volume}
                         </SvgText>
                       )}
                     </>
                   )}
-
-        <SvgText x={chartW - 28} y={padTop + 6} fontSize={8} fill={C.volRed}>
-          30%
-        </SvgText>
-        <SvgText x={chartW - 28} y={chartHeight / 2} fontSize={8} fill={C.volRed}>
-          26%
-        </SvgText>
-        <SvgText x={chartW - 28} y={chartHeight - padBottom} fontSize={8} fill={C.volRed}>
-          22%
-        </SvgText>
-      </Svg>
-                  {/* Strike tick on x-axis */}
-                  <Line
-                    x1={x}
-                    y1={chartHeight - padBottom}
-                    x2={x}
-                    y2={chartHeight - padBottom + 4}
-                    stroke="#3A3A50"
-                    strokeWidth={1}
-                  />
+                  <Line x1={x} y1={chartHeight - padBottom} x2={x} y2={chartHeight - padBottom + 4} stroke="#3A3A50" strokeWidth={1} />
                   <SvgText
                     x={x}
                     y={chartHeight - padBottom + 16}
@@ -558,76 +384,34 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
               );
             })}
 
-      <View style={styles.strikeAxisRow}>
-        <Text style={styles.strikeLabel}>4100</Text>
-        <Text style={styles.strikeLabel}>4200</Text>
-        <Text style={styles.strikeLabel}>4300</Text>
-        <Text style={[styles.strikeLabel, { color: C.gold, fontWeight: '700' }]}>4400 ATM</Text>
-        <Text style={styles.strikeLabel}>4500</Text>
-        <Text style={styles.strikeLabel}>4600</Text>
-        <Text style={styles.strikeLabel}>4700</Text>
-      </View>
-            {/* Vol Settle IV Curve (Red Dashed Line) */}
-            <Path
-              d={volCurveD}
-              fill="none"
-              stroke={C.volRed}
-              strokeWidth={2.4}
-              strokeDasharray="5, 3"
-            />
+            {/* Vol Settle IV Curve */}
+            <Path d={volCurveD} fill="none" stroke={C.volRed} strokeWidth={2.4} strokeDasharray="5, 3" />
 
-            {/* Underlying Spot Price Dashed Line */}
+            {/* Spot Price Line */}
             {data.spot_price >= minStrike && data.spot_price <= maxStrike && (
               <G>
-                <Line
-                  x1={spotX}
-                  y1={padTop}
-                  x2={spotX}
-                  y2={chartHeight - padBottom}
-                  stroke="#FFFFFF"
-                  strokeDasharray="4, 3"
-                  strokeWidth={2}
-                />
-                <SvgText
-                  x={spotX}
-                  y={chartHeight - padBottom + 30}
-                  fontSize={10}
-                  fill={C.white}
-                  fontWeight="800"
-                  textAnchor="middle"
-                >
-                  Spot ${data.spot_price.toFixed(1)}
+                <Line x1={spotX} y1={padTop} x2={spotX} y2={chartHeight - padBottom} stroke="#FFFFFF" strokeDasharray="4, 3" strokeWidth={2} />
+                <SvgText x={spotX} y={chartHeight - padBottom + 30} fontSize={10} fill={C.white} fontWeight="800" textAnchor="middle">
+                  Spot {data.spot_price.toFixed(1)}
                 </SvgText>
               </G>
             )}
 
-            {/* Left Y Axis (Volume Labels) */}
-            <SvgText x={4} y={padTop + 8} fontSize={9} fill={C.secondary} fontWeight="600">
-              400
-            </SvgText>
-            <SvgText x={4} y={chartHeight / 2 + 4} fontSize={9} fill={C.secondary} fontWeight="600">
-              200
-            </SvgText>
-            <SvgText x={4} y={chartHeight - padBottom - 2} fontSize={9} fill={C.secondary} fontWeight="600">
-              0
-            </SvgText>
+            {/* Left Y Axis Volume Labels */}
+            <SvgText x={4} y={padTop + 8} fontSize={9} fill={C.secondary} fontWeight="600">400</SvgText>
+            <SvgText x={4} y={chartHeight / 2 + 4} fontSize={9} fill={C.secondary} fontWeight="600">200</SvgText>
+            <SvgText x={4} y={chartHeight - padBottom - 2} fontSize={9} fill={C.secondary} fontWeight="600">0</SvgText>
 
-            {/* Right Y Axis (Volatility Smile % Labels) */}
-            <SvgText x={chartW - 30} y={padTop + 8} fontSize={9} fill={C.volRed} fontWeight="600">
-              30%
-            </SvgText>
-            <SvgText x={chartW - 30} y={chartHeight / 2 + 4} fontSize={9} fill={C.volRed} fontWeight="600">
-              26%
-            </SvgText>
-            <SvgText x={chartW - 30} y={chartHeight - padBottom - 2} fontSize={9} fill={C.volRed} fontWeight="600">
-              22%
-            </SvgText>
+            {/* Right Y Axis Vol% Labels */}
+            <SvgText x={chartW - 30} y={padTop + 8} fontSize={9} fill={C.volRed} fontWeight="600">30%</SvgText>
+            <SvgText x={chartW - 30} y={chartHeight / 2 + 4} fontSize={9} fill={C.volRed} fontWeight="600">26%</SvgText>
+            <SvgText x={chartW - 30} y={chartHeight - padBottom - 2} fontSize={9} fill={C.volRed} fontWeight="600">22%</SvgText>
           </Svg>
         </View>
       </ScrollView>
 
       {zoomLevel > 1.0 && (
-        <Text style={styles.scrollHint}>‚Üê Swipe horizontally to explore strikes ‚Üí</Text>
+        <Text style={styles.scrollHint}>Swipe horizontally to explore strikes</Text>
       )}
     </View>
   );
@@ -1035,7 +819,7 @@ export default function GoldInsightsScreen() {
             <>
               <View style={styles.priceCard}>
                 <View style={styles.priceCardTop}>
-                  <Text style={styles.priceLabel}>{quote.symbol} ó Active Contract</Text>
+                  <Text style={styles.priceLabel}>{quote.symbol} ÔøΩ Active Contract</Text>
                   {quote.is_delayed && (
                     <View style={styles.delayedPill}>
                       <Clock size={10} color="#888" />
