@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { Home, Target, TrendingUp, BarChart3, Menu } from 'lucide-react-native';
 import { Home, Target, TrendingUp, BarChart3, Menu, Coins } from 'lucide-react-native';
 
 export default function TabsLayout() {
