@@ -1,4 +1,3 @@
-import React, { useState, useCallback } from 'react';
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
@@ -135,10 +134,12 @@ async function fetchOIProfile(): Promise<OIProfileData> {
 }
 
 function fmtPrice(n: number) {
+  if (n == null || isNaN(n)) return '—';
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtNum(n: number) {
+  if (n == null || isNaN(n)) return '—';
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toString();
@@ -157,18 +158,10 @@ function fmtDate(iso: string) {
   }
 }
 
-function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }) {
-  const chartHeight = 220;
-  const padLeft = 32;
-  const padRight = 32;
-  const padTop = 26;
-  const padBottom = 26;
-  const chartW = Math.max(width - 32, 280);
 function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; containerWidth: number }) {
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [rangeMode, setRangeMode] = useState<'all' | 'active' | 'atm'>('active');
 
-  const strikes = data.strikes;
   const chartHeight = 330; // Significantly larger histogram height (up from 220)
   const padLeft = 36;
   const padRight = 36;
@@ -195,7 +188,6 @@ function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; contai
   const maxStrike = strikes[strikes.length - 1].strike;
   const strikeSpan = maxStrike - minStrike || 1;
 
-  const maxVol = Math.max(...strikes.map((s) => Math.max(s.put_volume, s.call_volume)), 350);
   const maxVol = Math.max(...strikes.map((s) => Math.max(s.put_volume, s.call_volume)), 360);
   const minVolSettle = 22.0;
   const maxVolSettle = 30.0;
@@ -937,7 +929,6 @@ export default function GoldInsightsScreen() {
             </View>
           </View>
 
-          <Vol2VolChart data={vol2vol} width={screenWidth} />
           <Vol2VolChart data={vol2vol} containerWidth={screenWidth} />
 
           <View style={styles.wallsContainer}>
@@ -1044,7 +1035,7 @@ export default function GoldInsightsScreen() {
             <>
               <View style={styles.priceCard}>
                 <View style={styles.priceCardTop}>
-                  <Text style={styles.priceLabel}>{quote.symbol} ? Active Contract</Text>
+                  <Text style={styles.priceLabel}>{quote.symbol} — Active Contract</Text>
                   {quote.is_delayed && (
                     <View style={styles.delayedPill}>
                       <Clock size={10} color="#888" />
