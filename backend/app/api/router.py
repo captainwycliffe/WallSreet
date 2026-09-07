@@ -9,6 +9,7 @@ from app.api.journal import router as journal_router
 from app.api.risk import router as risk_router
 from app.api.ea import router as ea_router
 from app.api.notifications import router as notifications_router
+from cme_gold.router import router as gold_router
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
@@ -21,6 +22,7 @@ api_router.include_router(journal_router)
 api_router.include_router(risk_router)
 api_router.include_router(ea_router)
 api_router.include_router(notifications_router)
+api_router.include_router(gold_router)
 
 @api_router.get("/status")
 def status():

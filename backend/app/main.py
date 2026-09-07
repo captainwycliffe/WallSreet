@@ -63,6 +63,14 @@ async def lifespan(app: FastAPI):
         ea_service.run_offline_monitor(), name="ea_offline_monitor"
     )
 
+    # Start CME Gold background polling scheduler
+    try:
+        from cme_gold.scheduler import start_scheduler, stop_scheduler as stop_gold_scheduler
+        start_scheduler()
+    except Exception as e:
+        logger.warning("Gold scheduler failed to start: %s", e)
+        stop_gold_scheduler = None  # type: ignore[assignment]
+
     logger.info("Backend ready ✓")
     yield
 
@@ -75,6 +83,8 @@ async def lifespan(app: FastAPI):
         pass
     await event_bus.stop()
     await ws_manager.shutdown()
+    if stop_gold_scheduler:
+        stop_gold_scheduler()
     await engine.dispose()
     logger.info("Shutdown complete")
 

@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     EA_HEARTBEAT_TIMEOUT_SECONDS: int = 60
     EA_OFFLINE_ALERT_AFTER_SECONDS: int = 120
 
+    # CME Gold / Databento integration
+    DATABENTO_API_KEY: str = ""
+    GOLD_QUOTE_INTERVAL_MINUTES: int = 5
+    GOLD_COT_INTERVAL_HOURS: int = 6
+
     # Demo / Seed
     DEMO_MODE: bool = True
     SEED_DEMO_DATA: bool = True
