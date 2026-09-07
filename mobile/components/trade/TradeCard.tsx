@@ -14,7 +14,6 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
   const profit = trade.profit || 0;
   const prefix = profit >= 0 ? "+" : "";
   let progress = 0;
-  if (trade.current_price && trade.take_profit && trade.entry_price) {
   if (trade.current_price && trade.take_profit && trade.entry_price && trade.take_profit > 0) {
     const totalDist = Math.abs(trade.take_profit - trade.entry_price);
     const currDist = isBuy
@@ -46,10 +45,6 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
 
       <View style={[styles.row, { marginBottom: 12 }]}>
         {[
-          { label: "Entry", value: trade.entry_price.toFixed(5), color: C.white },
-          { label: "Current", value: trade.current_price?.toFixed(5) || "-", color: C.white },
-          { label: "Stop", value: trade.stop_loss.toFixed(5), color: C.red },
-          { label: "Target", value: trade.take_profit.toFixed(5), color: C.green },
           { label: "Entry", value: fmt(trade.entry_price), color: C.white },
           { label: "Current", value: fmt(trade.current_price), color: C.white },
           { label: "Stop", value: fmt(trade.stop_loss, true), color: C.red },
