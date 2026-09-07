@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +19,9 @@ import {
   Clock,
   Shield,
   Layers,
+  ZoomIn,
+  ZoomOut,
+  Target,
 } from 'lucide-react-native';
 import Svg, { Rect, Path, Line, Text as SvgText, G } from 'react-native-svg';
 import api from '../../../services/api';
@@ -160,15 +164,39 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
   const padTop = 26;
   const padBottom = 26;
   const chartW = Math.max(width - 32, 280);
+function Vol2VolChart({ data, containerWidth }: { data: Vol2VolRangeData; containerWidth: number }) {
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [rangeMode, setRangeMode] = useState<'all' | 'active' | 'atm'>('active');
 
   const strikes = data.strikes;
+  const chartHeight = 330; // Significantly larger histogram height (up from 220)
+  const padLeft = 36;
+  const padRight = 36;
+  const padTop = 32;
+  const padBottom = 36;
+
+  const filteredStrikes = useMemo(() => {
+    if (rangeMode === 'atm') {
+      return data.strikes.filter((s) => s.strike >= 4300 && s.strike <= 4650);
+    }
+    if (rangeMode === 'active') {
+      return data.strikes.filter((s) => s.strike >= 4200 && s.strike <= 4750);
+    }
+    return data.strikes;
+  }, [data.strikes, rangeMode]);
+
+  const strikes = filteredStrikes;
   if (!strikes || strikes.length === 0) return null;
+
+  const baseW = Math.max(containerWidth - 32, 320);
+  const chartW = Math.round(baseW * zoomLevel);
 
   const minStrike = strikes[0].strike;
   const maxStrike = strikes[strikes.length - 1].strike;
   const strikeSpan = maxStrike - minStrike || 1;
 
   const maxVol = Math.max(...strikes.map((s) => Math.max(s.put_volume, s.call_volume)), 350);
+  const maxVol = Math.max(...strikes.map((s) => Math.max(s.put_volume, s.call_volume)), 360);
   const minVolSettle = 22.0;
   const maxVolSettle = 30.0;
   const volSpan = maxVolSettle - minVolSettle;
@@ -197,8 +225,22 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
     }
   });
 
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(Number((prev + 0.5).toFixed(1)), 2.5));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => Math.max(Number((prev - 0.5).toFixed(1)), 1.0));
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+    setRangeMode('active');
+  };
+
   return (
     <View style={styles.chartWrapper}>
+      {/* Top Legend & Header */}
       <View style={styles.chartHeaderRow}>
         <View style={styles.legendRow}>
           <View style={[styles.legendDot, { backgroundColor: C.putYellow }]} />
@@ -209,6 +251,7 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
           <Text style={styles.legendText}>Vol Settle</Text>
         </View>
         <Text style={styles.chartUnitText}>QuikStrike? Vol2Vol?</Text>
+        <Text style={styles.chartUnitText}>QuikStrike® Vol2Vol™</Text>
       </View>
 
       <Svg width={chartW} height={chartHeight}>
@@ -220,6 +263,34 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
           fill="#1C2030"
           opacity={0.6}
         />
+      {/* Zoom & Range Toolbar (Just like CME Group tool) */}
+      <View style={styles.zoomToolbar}>
+        <View style={styles.filterGroup}>
+          <TouchableOpacity
+            style={[styles.filterBtn, rangeMode === 'active' && styles.filterBtnActive]}
+            onPress={() => setRangeMode('active')}
+          >
+            <Text style={[styles.filterBtnText, rangeMode === 'active' && styles.filterBtnTextActive]}>
+              Active (3P / 3C)
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterBtn, rangeMode === 'atm' && styles.filterBtnActive]}
+            onPress={() => setRangeMode('atm')}
+          >
+            <Text style={[styles.filterBtnText, rangeMode === 'atm' && styles.filterBtnTextActive]}>
+              ATM Focus
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterBtn, rangeMode === 'all' && styles.filterBtnActive]}
+            onPress={() => setRangeMode('all')}
+          >
+            <Text style={[styles.filterBtnText, rangeMode === 'all' && styles.filterBtnTextActive]}>
+              All Strikes
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {data.delta_zones.map((dz, i) => {
           const x = xForStrike(dz.strike);
@@ -233,6 +304,36 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
                 stroke="#2A2A40"
                 strokeDasharray="2, 3"
                 strokeWidth={1}
+        <View style={styles.zoomControls}>
+          <TouchableOpacity style={styles.zoomIconBtn} onPress={handleZoomOut}>
+            <ZoomOut size={16} color={zoomLevel > 1.0 ? C.white : C.dim} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.zoomResetBtn} onPress={handleResetZoom}>
+            <Text style={styles.zoomLevelText}>{Math.round(zoomLevel * 100)}%</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.zoomIconBtn} onPress={handleZoomIn}>
+            <ZoomIn size={16} color={zoomLevel < 2.5 ? C.gold : C.dim} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Scrollable Horizontal Chart Container for Zoom */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={zoomLevel > 1.0}
+        contentContainerStyle={{ minWidth: baseW }}
+      >
+        <View>
+          <Svg width={chartW} height={chartHeight}>
+            {/* Shaded 1-Sigma Expected Range Band */}
+            {expLowX < chartW && expHighX > 0 && (
+              <Rect
+                x={Math.max(expLowX, padLeft)}
+                y={padTop}
+                width={Math.min(expHighX - expLowX, chartW - padRight - expLowX)}
+                height={chartHeight - padTop - padBottom}
+                fill="#171A29"
+                opacity={0.7}
               />
               <SvgText
                 x={x}
@@ -247,10 +348,36 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
             </G>
           );
         })}
+            )}
 
         {strikes.map((s, idx) => {
           const x = xForStrike(s.strike);
           const barW = Math.max((chartW - padLeft - padRight) / strikes.length - 2, 4);
+            {/* Horizontal Gridlines */}
+            <Line
+              x1={padLeft}
+              y1={padTop}
+              x2={chartW - padRight}
+              y2={padTop}
+              stroke="#1C1C2C"
+              strokeWidth={1}
+            />
+            <Line
+              x1={padLeft}
+              y1={chartHeight / 2}
+              x2={chartW - padRight}
+              y2={chartHeight / 2}
+              stroke="#1C1C2C"
+              strokeWidth={1}
+            />
+            <Line
+              x1={padLeft}
+              y1={chartHeight - padBottom}
+              x2={chartW - padRight}
+              y2={chartHeight - padBottom}
+              stroke="#2A2A3A"
+              strokeWidth={1.2}
+            />
 
           return (
             <G key={idx}>
@@ -277,6 +404,34 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
             </G>
           );
         })}
+            {/* Delta Zone Guideline Markers */}
+            {data.delta_zones.map((dz, i) => {
+              if (dz.strike < minStrike || dz.strike > maxStrike) return null;
+              const x = xForStrike(dz.strike);
+              return (
+                <G key={i}>
+                  <Line
+                    x1={x}
+                    y1={padTop - 8}
+                    x2={x}
+                    y2={chartHeight - padBottom}
+                    stroke="#2A2A40"
+                    strokeDasharray="2, 3"
+                    strokeWidth={1}
+                  />
+                  <SvgText
+                    x={x}
+                    y={padTop - 12}
+                    fontSize={10}
+                    fill={C.dim}
+                    textAnchor="middle"
+                    fontWeight="600"
+                  >
+                    {dz.label}
+                  </SvgText>
+                </G>
+              );
+            })}
 
         <Path
           d={volCurveD}
@@ -285,6 +440,11 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
           strokeWidth={2}
           strokeDasharray="4, 3"
         />
+            {/* Histogram Volume Bars */}
+            {strikes.map((s, idx) => {
+              const x = xForStrike(s.strike);
+              const slotWidth = (chartW - padLeft - padRight) / strikes.length;
+              const barW = Math.max(slotWidth * 0.55, 6);
 
         <Line
           x1={spotX}
@@ -295,6 +455,8 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
           strokeDasharray="3, 2"
           strokeWidth={1.5}
         />
+              const isMajorPut = s.put_volume >= 150;
+              const isMajorCall = s.call_volume >= 150;
 
         <SvgText
           x={spotX}
@@ -306,6 +468,34 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
         >
           {data.spot_price.toFixed(1)}
         </SvgText>
+              return (
+                <G key={idx}>
+                  {/* Put Volume Bar (Yellow) */}
+                  {s.put_volume > 0 && (
+                    <>
+                      <Rect
+                        x={x - barW / 2}
+                        y={yForVolume(s.put_volume)}
+                        width={barW}
+                        height={chartHeight - padBottom - yForVolume(s.put_volume)}
+                        fill={C.putYellow}
+                        rx={3}
+                      />
+                      {/* Volume numbers on major bars */}
+                      {isMajorPut && (
+                        <SvgText
+                          x={x}
+                          y={yForVolume(s.put_volume) - 4}
+                          fontSize={9}
+                          fill={C.putYellow}
+                          fontWeight="700"
+                          textAnchor="middle"
+                        >
+                          {s.put_volume}
+                        </SvgText>
+                      )}
+                    </>
+                  )}
 
         <SvgText x={4} y={padTop + 6} fontSize={8} fill={C.secondary}>
           400
@@ -316,6 +506,32 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
         <SvgText x={4} y={chartHeight - padBottom} fontSize={8} fill={C.secondary}>
           0
         </SvgText>
+                  {/* Call Volume Bar (Blue) */}
+                  {s.call_volume > 0 && (
+                    <>
+                      <Rect
+                        x={x - barW / 2}
+                        y={yForVolume(s.call_volume)}
+                        width={barW}
+                        height={chartHeight - padBottom - yForVolume(s.call_volume)}
+                        fill={C.callBlue}
+                        rx={3}
+                      />
+                      {/* Volume numbers on major bars */}
+                      {isMajorCall && (
+                        <SvgText
+                          x={x}
+                          y={yForVolume(s.call_volume) - 4}
+                          fontSize={9}
+                          fill={C.callBlue}
+                          fontWeight="700"
+                          textAnchor="middle"
+                        >
+                          {s.call_volume}
+                        </SvgText>
+                      )}
+                    </>
+                  )}
 
         <SvgText x={chartW - 28} y={padTop + 6} fontSize={8} fill={C.volRed}>
           30%
@@ -327,6 +543,28 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
           22%
         </SvgText>
       </Svg>
+                  {/* Strike tick on x-axis */}
+                  <Line
+                    x1={x}
+                    y1={chartHeight - padBottom}
+                    x2={x}
+                    y2={chartHeight - padBottom + 4}
+                    stroke="#3A3A50"
+                    strokeWidth={1}
+                  />
+                  <SvgText
+                    x={x}
+                    y={chartHeight - padBottom + 16}
+                    fontSize={zoomLevel > 1.2 ? 10 : 8.5}
+                    fill={s.strike === 4400 ? C.gold : C.secondary}
+                    fontWeight={s.strike === 4400 || isMajorPut || isMajorCall ? 'bold' : 'normal'}
+                    textAnchor="middle"
+                  >
+                    {s.strike}
+                  </SvgText>
+                </G>
+              );
+            })}
 
       <View style={styles.strikeAxisRow}>
         <Text style={styles.strikeLabel}>4100</Text>
@@ -337,6 +575,68 @@ function Vol2VolChart({ data, width }: { data: Vol2VolRangeData; width: number }
         <Text style={styles.strikeLabel}>4600</Text>
         <Text style={styles.strikeLabel}>4700</Text>
       </View>
+            {/* Vol Settle IV Curve (Red Dashed Line) */}
+            <Path
+              d={volCurveD}
+              fill="none"
+              stroke={C.volRed}
+              strokeWidth={2.4}
+              strokeDasharray="5, 3"
+            />
+
+            {/* Underlying Spot Price Dashed Line */}
+            {data.spot_price >= minStrike && data.spot_price <= maxStrike && (
+              <G>
+                <Line
+                  x1={spotX}
+                  y1={padTop}
+                  x2={spotX}
+                  y2={chartHeight - padBottom}
+                  stroke="#FFFFFF"
+                  strokeDasharray="4, 3"
+                  strokeWidth={2}
+                />
+                <SvgText
+                  x={spotX}
+                  y={chartHeight - padBottom + 30}
+                  fontSize={10}
+                  fill={C.white}
+                  fontWeight="800"
+                  textAnchor="middle"
+                >
+                  Spot ${data.spot_price.toFixed(1)}
+                </SvgText>
+              </G>
+            )}
+
+            {/* Left Y Axis (Volume Labels) */}
+            <SvgText x={4} y={padTop + 8} fontSize={9} fill={C.secondary} fontWeight="600">
+              400
+            </SvgText>
+            <SvgText x={4} y={chartHeight / 2 + 4} fontSize={9} fill={C.secondary} fontWeight="600">
+              200
+            </SvgText>
+            <SvgText x={4} y={chartHeight - padBottom - 2} fontSize={9} fill={C.secondary} fontWeight="600">
+              0
+            </SvgText>
+
+            {/* Right Y Axis (Volatility Smile % Labels) */}
+            <SvgText x={chartW - 30} y={padTop + 8} fontSize={9} fill={C.volRed} fontWeight="600">
+              30%
+            </SvgText>
+            <SvgText x={chartW - 30} y={chartHeight / 2 + 4} fontSize={9} fill={C.volRed} fontWeight="600">
+              26%
+            </SvgText>
+            <SvgText x={chartW - 30} y={chartHeight - padBottom - 2} fontSize={9} fill={C.volRed} fontWeight="600">
+              22%
+            </SvgText>
+          </Svg>
+        </View>
+      </ScrollView>
+
+      {zoomLevel > 1.0 && (
+        <Text style={styles.scrollHint}>← Swipe horizontally to explore strikes →</Text>
+      )}
     </View>
   );
 }
@@ -574,11 +874,13 @@ export default function GoldInsightsScreen() {
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
           <Text style={styles.headerTitle}>?? Gold (OG|GC)</Text>
+          <Text style={styles.headerTitle}>Gold (OG | GC)</Text>
           <View style={styles.cmeBadge}>
             <Text style={styles.cmeBadgeText}>CME GROUP</Text>
           </View>
         </View>
         <Text style={styles.headerSub}>QuikStrike? Options & Futures Positioning</Text>
+        <Text style={styles.headerSub}>QuikStrike® Options & Futures Positioning</Text>
       </View>
 
       <View style={styles.tabBar}>
@@ -588,6 +890,7 @@ export default function GoldInsightsScreen() {
         >
           <Text style={[styles.tabBtnText, activeTab === 'vol2vol' && styles.tabBtnTextActive]}>
             Vol2Vol? Range
+            Vol2Vol™ Range
           </Text>
         </TouchableOpacity>
 
@@ -635,31 +938,60 @@ export default function GoldInsightsScreen() {
           </View>
 
           <Vol2VolChart data={vol2vol} width={screenWidth} />
+          <Vol2VolChart data={vol2vol} containerWidth={screenWidth} />
 
           <View style={styles.wallsContainer}>
             <View style={[styles.wallCard, { borderColor: '#FFB80040' }]}>
               <View style={styles.wallHeaderRow}>
                 <Shield size={14} color={C.putYellow} />
                 <Text style={[styles.wallTag, { color: C.putYellow }]}>PUT SUPPORT WALL</Text>
+                <Text style={[styles.wallTag, { color: C.putYellow }]}>TOP 3 PUT SUPPORT WALLS</Text>
               </View>
               <Text style={styles.wallPrice}>${vol2vol.put_wall_strike.toFixed(0)}</Text>
               <Text style={styles.wallSub}>Heavy Put Volume Defense</Text>
+              <View style={styles.wallItemRow}>
+                <Text style={styles.wallPriceSmall}>$4,300</Text>
+                <Text style={[styles.wallCountSmall, { color: C.putYellow }]}>334 vol (Major)</Text>
+              </View>
+              <View style={styles.wallItemRow}>
+                <Text style={styles.wallPriceSmall}>$4,250</Text>
+                <Text style={[styles.wallCountSmall, { color: C.putYellow }]}>195 vol</Text>
+              </View>
+              <View style={styles.wallItemRow}>
+                <Text style={styles.wallPriceSmall}>$4,400</Text>
+                <Text style={[styles.wallCountSmall, { color: C.putYellow }]}>172 vol (ATM)</Text>
+              </View>
             </View>
 
             <View style={[styles.wallCard, { borderColor: '#00D4FF40' }]}>
               <View style={styles.wallHeaderRow}>
                 <Shield size={14} color={C.callBlue} />
                 <Text style={[styles.wallTag, { color: C.callBlue }]}>CALL CEILING WALL</Text>
+                <Text style={[styles.wallTag, { color: C.callBlue }]}>TOP 3 CALL RESISTANCE WALLS</Text>
               </View>
               <Text style={styles.wallPrice}>${vol2vol.call_wall_strike.toFixed(0)}</Text>
               <Text style={styles.wallSub}>Major Call Resistance Block</Text>
+              <View style={styles.wallItemRow}>
+                <Text style={styles.wallPriceSmall}>$4,700</Text>
+                <Text style={[styles.wallCountSmall, { color: C.callBlue }]}>318 vol (Major)</Text>
+              </View>
+              <View style={styles.wallItemRow}>
+                <Text style={styles.wallPriceSmall}>$4,600</Text>
+                <Text style={[styles.wallCountSmall, { color: C.callBlue }]}>295 vol</Text>
+              </View>
+              <View style={styles.wallItemRow}>
+                <Text style={styles.wallPriceSmall}>$4,550</Text>
+                <Text style={[styles.wallCountSmall, { color: C.callBlue }]}>276 vol</Text>
+              </View>
             </View>
           </View>
 
           <View style={styles.rangeBox}>
             <Text style={styles.rangeBoxTitle}>Vol2Vol? Expected Move (1? Band)</Text>
+            <Text style={styles.rangeBoxTitle}>Vol2Vol™ Expected Move (1σ Band)</Text>
             <Text style={styles.rangeBoxVal}>
               ${vol2vol.expected_range_low.toFixed(0)} ? ${vol2vol.expected_range_high.toFixed(0)}
+              ${vol2vol.expected_range_low.toFixed(0)} – ${vol2vol.expected_range_high.toFixed(0)}
             </Text>
             <Text style={styles.rangeBoxSub}>
               Statistical implied move based on CME volatility settle curve.
@@ -696,6 +1028,7 @@ export default function GoldInsightsScreen() {
 
           <View style={styles.insightCard}>
             <Text style={styles.insightTitle}>??? Institutional Liquidity Block</Text>
+            <Text style={styles.insightTitle}>Key Institutional Liquidity Block</Text>
             <Text style={styles.insightText}>
               Contract <Text style={{ color: C.gold, fontWeight: 'bold' }}>OGZ6 (Dec 2026)</Text>{' '}
               anchors the primary market open interest with 278.9K Call contracts vs 79.4K Put
@@ -880,6 +1213,64 @@ const styles = StyleSheet.create({
   legendText: { fontSize: 11, color: C.secondary, marginLeft: 4 },
   chartUnitText: { fontSize: 10, color: C.dim, fontWeight: '600' },
 
+  zoomToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    backgroundColor: C.surface2,
+    borderRadius: 8,
+    padding: 4,
+  },
+  filterGroup: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  filterBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  filterBtnActive: {
+    backgroundColor: C.surface,
+  },
+  filterBtnText: {
+    fontSize: 10,
+    color: C.secondary,
+    fontWeight: '600',
+  },
+  filterBtnTextActive: {
+    color: C.gold,
+    fontWeight: '700',
+  },
+  zoomControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  zoomIconBtn: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: C.surface,
+  },
+  zoomResetBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  zoomLevelText: {
+    fontSize: 10,
+    color: C.white,
+    fontWeight: '700',
+  },
+  scrollHint: {
+    fontSize: 10,
+    color: C.dim,
+    textAlign: 'center',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+
   strikeAxisRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -900,6 +1291,24 @@ const styles = StyleSheet.create({
   wallTag: { fontSize: 10, fontWeight: '700' },
   wallPrice: { fontSize: 20, fontWeight: '800', color: C.white },
   wallSub: { fontSize: 10, color: C.secondary, marginTop: 2 },
+  wallItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingVertical: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E1E2C',
+  },
+  wallPriceSmall: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.white,
+  },
+  wallCountSmall: {
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
 
   rangeBox: {
     backgroundColor: C.surface,
