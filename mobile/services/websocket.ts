@@ -9,7 +9,7 @@ class WebSocketService {
   private pingInterval: any = null;
 
   connect(userId: string, token: string): void {
-    const wsUrl = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.0.101:8080/ws';
+    const wsUrl = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.100.76:8080/ws';
     this.isIntentionalDisconnect = false;
     
     if (this.ws) {
