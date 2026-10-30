@@ -45,12 +45,6 @@ class ConnectionManager:
     # ─── Lifecycle ────────────────────────────────────────────────────────────
 
     async def startup(self):
-        """Start Redis listener. Call on application startup."""
-        self._redis = Redis.from_url(settings.REDIS_URL, decode_responses=True)
-        self._pubsub_task = asyncio.create_task(
-            self._redis_subscribe_loop(), name="ws_redis_listener"
-        )
-        logger.info("WebSocket manager started with Redis pub/sub")
         """Try to connect to Redis. Silently degrade to in-memory mode on failure."""
         try:
             redis = Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_connect_timeout=2)
@@ -62,9 +56,9 @@ class ConnectionManager:
             logger.info("WebSocket manager started with Redis pub/sub (%s)", settings.REDIS_URL)
         except Exception as e:
             self._redis = None
-            logger.warning(
-                "Redis unavailable (%s) — WebSocket manager running in single-process "
-                "in-memory mode. Real-time delivery still works for this worker.", e
+            logger.info(
+                "Redis unavailable (%s) — WebSocket manager running in in-memory mode. "
+                "Real-time delivery active.", e
             )
 
 
