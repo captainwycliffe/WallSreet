@@ -31,5 +31,5 @@ class TradeRepository:
         return trade
         
     async def get_all_for_account(self, account_id: str) -> List[Trade]:
-        result = await self.db.execute(select(Trade).where(Trade.account_id == account_id))
+        result = await self.db.execute(select(Trade).where(Trade.account_id == account_id).order_by(Trade.opened_at.desc()))
         return list(result.scalars().all())

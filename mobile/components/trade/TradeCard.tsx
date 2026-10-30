@@ -21,7 +21,17 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
       : Math.max(0, trade.entry_price - trade.current_price);
     progress = Math.min(100, (currDist / totalDist) * 100);
   }
-  const duration = formatDistanceToNow(new Date(trade.opened_at), { addSuffix: false });
+  let duration = "recently";
+  try {
+    if (trade.opened_at) {
+      const d = new Date(trade.opened_at);
+      if (!isNaN(d.getTime())) {
+        duration = formatDistanceToNow(d, { addSuffix: false });
+      }
+    }
+  } catch {
+    duration = "recently";
+  }
 
   const fmt = (val: number | undefined, isStopOrTarget = false) => {
     if (val === undefined || val === null) return "-";

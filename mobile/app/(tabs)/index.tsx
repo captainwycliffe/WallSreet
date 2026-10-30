@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,21 @@ import { useAuthStore } from '../../store/authStore';
 import { useAccounts } from '../../hooks/useAccount';
 import { usePOIs } from '../../hooks/usePOIs';
 import { useTrades } from '../../hooks/useTrades';
+import { useRiskDashboard } from '../../hooks/useRisk';
 import { useQuery } from '@tanstack/react-query';
 import { eaService } from '../../services/api';
 import { TradeCard } from '../../components/trade/TradeCard';
+import { TradeCalendar } from '../../components/trade/TradeCalendar';
 import { POICard } from '../../components/poi/POICard';
-import { Cpu, ArrowRight, TrendingUp, Target } from 'lucide-react-native';
+import {
+  ArrowRight,
+  TrendingUp,
+  Target,
+  ShieldAlert,
+  Calendar as CalendarIcon,
+  AlertTriangle,
+  ChevronRight,
+} from 'lucide-react-native';
 
 const C = {
   bg: '#0A0A0F',
@@ -34,24 +44,49 @@ const C = {
   textMuted: '#555577',
 };
 
+function LimitProgressBar({ pct, limitPct, label }: { pct: number; limitPct: number; label: string }) {
+  const safeLimit = limitPct > 0 ? limitPct : 1;
+  const ratio = Math.min(Math.max(pct, 0) / safeLimit, 1);
+  const color = ratio >= 1 ? C.red : ratio >= 0.75 ? C.amber : C.green;
+
+  return (
+    <View style={styles.limitBarItem}>
+      <View style={styles.limitBarHeader}>
+        <Text style={styles.limitBarLabel}>{label}</Text>
+        <Text style={styles.limitBarVal}>
+          <Text style={{ color, fontWeight: '700' }}>{pct.toFixed(1)}%</Text>
+          <Text style={{ color: C.textSecondary }}> / {limitPct.toFixed(1)}%</Text>
+        </Text>
+      </View>
+      <View style={styles.limitBarTrack}>
+        <View style={[styles.limitBarFill, { width: `${ratio * 100}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<'trades' | 'calendar'>('trades');
+
   const { data: accounts, refetch: refetchAccounts, isFetching: isFetchingAccounts } = useAccounts();
   const { data: poisData, refetch: refetchPOIs, isFetching: isFetchingPOIs } = usePOIs();
   const { data: tradesData, refetch: refetchTrades, isFetching: isFetchingTrades } = useTrades();
+  const { data: riskData, refetch: refetchRisk, isFetching: isFetchingRisk } = useRiskDashboard();
 
-  const { data: eas, refetch: refetchEAs } = useQuery({
+  const { data: eas, refetch: refetchEAs, isFetching: isFetchingEAs } = useQuery({
     queryKey: ['eaMonitor'],
     queryFn: () => eaService.getMonitor(),
     refetchInterval: 10000,
   });
 
-  const isFetching = isFetchingAccounts || isFetchingPOIs || isFetchingTrades;
+  const isFetching = isFetchingAccounts || isFetchingPOIs || isFetchingTrades || isFetchingRisk || isFetchingEAs;
   const refetchAll = () => {
     refetchAccounts();
     refetchPOIs();
     refetchTrades();
+    refetchRisk();
     refetchEAs();
   };
 
@@ -67,6 +102,14 @@ export default function DashboardScreen() {
   const activePOIs = pois.filter((p) => p.status === 'ACTIVE');
   const tpHits = pois.filter((p) => p.status === 'TP_HIT').length;
   const slHits = pois.filter((p) => p.status === 'SL_HIT').length;
+
+  // Active risk limits
+  const dailyRiskPct = riskData?.daily_risk_pct ?? 0;
+  const dailyRiskLimit = riskData?.limits?.daily_risk_limit_pct ?? 5.0;
+  const drawdownPct = riskData?.daily_drawdown_pct ?? 0;
+  const maxDrawdownLimit = riskData?.limits?.max_drawdown_pct ?? 10.0;
+  const riskPerTrade = riskData?.risk_per_trade_pct ?? 0;
+  const riskPerTradeTarget = riskData?.limits?.risk_per_trade_pct ?? 2.0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -121,10 +164,10 @@ export default function DashboardScreen() {
                 <Text style={styles.accountMetricLabel}>Open P/L</Text>
                 <Text style={[
                   styles.accountMetricValue,
-                  { color: (account.openPL ?? 0) >= 0 ? C.green : C.red },
+                  { color: (account.open_pl ?? 0) >= 0 ? C.green : C.red },
                 ]}>
-                  {(account.openPL ?? 0) >= 0 ? '+' : ''}
-                  ${Number(account.openPL ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {(account.open_pl ?? 0) >= 0 ? '+' : ''}
+                  ${Number(account.open_pl ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
               <View style={styles.metricDivider} />
@@ -132,10 +175,10 @@ export default function DashboardScreen() {
                 <Text style={styles.accountMetricLabel}>Daily P/L</Text>
                 <Text style={[
                   styles.accountMetricValue,
-                  { color: (account.dailyPL ?? 0) >= 0 ? C.green : C.red },
+                  { color: (account.daily_pl ?? 0) >= 0 ? C.green : C.red },
                 ]}>
-                  {(account.dailyPL ?? 0) >= 0 ? '+' : ''}
-                  ${Number(account.dailyPL ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {(account.daily_pl ?? 0) >= 0 ? '+' : ''}
+                  ${Number(account.daily_pl ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
             </View>
@@ -145,6 +188,36 @@ export default function DashboardScreen() {
             <Text style={styles.emptyText}>No account connected</Text>
           </View>
         )}
+
+        {/* ── Account Limits & Live Risk Section ── */}
+        <View style={styles.riskCard}>
+          <View style={styles.riskHeaderRow}>
+            <View style={styles.riskTitleLeft}>
+              <ShieldAlert size={16} color={C.green} />
+              <Text style={styles.riskTitleText}>Account Limits & Risk</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.riskDetailLink}
+              onPress={() => router.push('/(tabs)/more/risk' as any)}
+            >
+              <Text style={styles.riskDetailText}>Details</Text>
+              <ChevronRight size={14} color={C.green} />
+            </TouchableOpacity>
+          </View>
+
+          <LimitProgressBar pct={dailyRiskPct} limitPct={dailyRiskLimit} label="Daily Risk Limit" />
+          <LimitProgressBar pct={drawdownPct} limitPct={maxDrawdownLimit} label="Max Drawdown" />
+          <LimitProgressBar pct={riskPerTrade} limitPct={riskPerTradeTarget} label="Risk Per Trade" />
+
+          {riskData?.warnings && riskData.warnings.length > 0 && (
+            <View style={styles.riskWarningBadge}>
+              <AlertTriangle size={14} color={C.amber} />
+              <Text style={styles.riskWarningText} numberOfLines={1}>
+                {riskData.warnings[0].message}
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* ── POI Counter Row ── */}
         <View style={styles.poiCounterRow}>
@@ -166,39 +239,78 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ── Active Trades ── */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionHeaderLeft}>
-            <TrendingUp size={18} color={C.green} />
-            <Text style={styles.sectionTitle}>Active Trades</Text>
-            <View style={styles.sectionBadge}>
-              <Text style={styles.sectionBadgeText}>{activeTrades.length}</Text>
-            </View>
-          </View>
+        {/* ── Segment Switcher: Active Trades vs Trade Calendar History ── */}
+        <View style={styles.segmentContainer}>
           <TouchableOpacity
-            style={styles.sectionAction}
-            onPress={() => router.push('/(tabs)/trades')}
+            style={[styles.segmentBtn, activeTab === 'trades' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('trades')}
+            activeOpacity={0.7}
           >
-            <Text style={styles.sectionActionText}>View All</Text>
-            <ArrowRight size={14} color={C.green} />
+            <TrendingUp size={15} color={activeTab === 'trades' ? C.green : C.textSecondary} />
+            <Text style={[styles.segmentBtnText, activeTab === 'trades' && styles.segmentBtnTextActive]}>
+              Active Trades ({activeTrades.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'calendar' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('calendar')}
+            activeOpacity={0.7}
+          >
+            <CalendarIcon size={15} color={activeTab === 'calendar' ? C.green : C.textSecondary} />
+            <Text style={[styles.segmentBtnText, activeTab === 'calendar' && styles.segmentBtnTextActive]}>
+              History Calendar
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {activeTrades.length > 0 ? (
-          activeTrades.slice(0, 5).map((trade) => (
-            <View key={trade.id} style={styles.cardItem}>
-              <TradeCard trade={trade} />
+        {/* ── Tab Content: Active Trades or Calendar History ── */}
+        {activeTab === 'trades' ? (
+          <View>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <TrendingUp size={18} color={C.green} />
+                <Text style={styles.sectionTitle}>Active Positions</Text>
+                <View style={styles.sectionBadge}>
+                  <Text style={styles.sectionBadgeText}>{activeTrades.length}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.sectionAction}
+                onPress={() => router.push('/(tabs)/trades')}
+              >
+                <Text style={styles.sectionActionText}>View All</Text>
+                <ArrowRight size={14} color={C.green} />
+              </TouchableOpacity>
             </View>
-          ))
+
+            {activeTrades.length > 0 ? (
+              activeTrades.map((trade) => (
+                <View key={trade.id} style={styles.cardItem}>
+                  <TradeCard
+                    trade={trade}
+                    onPress={() => router.push(`/(tabs)/trades/${trade.id}` as any)}
+                  />
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <TrendingUp size={32} color={C.textMuted} />
+                <Text style={styles.emptyStateTitle}>No Active Trades</Text>
+                <Text style={styles.emptyStateSubtitle}>Live positions reported by MT5 will appear here</Text>
+              </View>
+            )}
+          </View>
         ) : (
-          <View style={styles.emptyState}>
-            <TrendingUp size={32} color={C.textMuted} />
-            <Text style={styles.emptyStateTitle}>No Active Trades</Text>
-            <Text style={styles.emptyStateSubtitle}>Open positions will appear here</Text>
+          <View style={styles.calendarSection}>
+            <TradeCalendar
+              trades={trades}
+              onSelectTrade={(trade) => router.push(`/(tabs)/trades/${trade.id}` as any)}
+            />
           </View>
         )}
 
-        {/* ── Pending POIs ── */}
+        {/* ── Pending POIs Section ── */}
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
           <View style={styles.sectionHeaderLeft}>
             <Target size={18} color={C.amber} />
@@ -248,6 +360,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 32,
   },
 
   // ── Header ──
@@ -255,7 +368,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   headerLeft: {
     flexDirection: 'column',
@@ -300,30 +413,32 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.border,
-    padding: 16,
-    marginBottom: 16,
+    padding: 18,
+    marginBottom: 14,
   },
   accountBrokerLabel: {
     fontSize: 12,
     color: C.textSecondary,
     marginBottom: 6,
+    fontWeight: '500',
   },
   accountBalance: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '800',
     color: C.white,
     letterSpacing: -0.5,
   },
   accountBalanceLabel: {
-    fontSize: 12,
-    color: C.textMuted,
+    fontSize: 11,
+    color: C.textSecondary,
     marginTop: 2,
     marginBottom: 16,
   },
   accountMetricsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 12,
+    justifyContent: 'space-between',
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: C.border,
   },
@@ -347,36 +462,145 @@ const styles = StyleSheet.create({
     backgroundColor: C.border,
   },
 
+  // ── Risk & Limits Card ──
+  riskCard: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 16,
+    marginBottom: 14,
+  },
+  riskHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  riskTitleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  riskTitleText: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  riskDetailLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  riskDetailText: {
+    color: C.green,
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 2,
+  },
+  limitBarItem: {
+    marginBottom: 10,
+  },
+  limitBarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  limitBarLabel: {
+    color: C.textSecondary,
+    fontSize: 12,
+  },
+  limitBarVal: {
+    fontSize: 12,
+  },
+  limitBarTrack: {
+    height: 6,
+    backgroundColor: C.surface2,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  limitBarFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  riskWarningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 184, 0, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 4,
+    gap: 6,
+  },
+  riskWarningText: {
+    color: C.amber,
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+
   // ── POI Counter Row ──
   poiCounterRow: {
     flexDirection: 'row',
-    marginBottom: 24,
     gap: 8,
+    marginBottom: 16,
   },
   poiCounterBox: {
     flex: 1,
     backgroundColor: C.surface,
     borderRadius: 12,
     borderWidth: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   poiCounterValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: -0.5,
+    marginBottom: 2,
   },
   poiCounterLabel: {
     fontSize: 10,
-    fontWeight: '600',
     color: C.textSecondary,
-    marginTop: 2,
+    fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
 
-  // ── Section Headers ──
+  // ── Segment Switcher ──
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 4,
+    marginBottom: 16,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  segmentBtnActive: {
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: '#3A3A50',
+  },
+  segmentBtnText: {
+    color: C.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  segmentBtnTextActive: {
+    color: C.white,
+    fontWeight: '700',
+  },
+
+  // ── Sections ──
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -386,19 +610,18 @@ const styles = StyleSheet.create({
   sectionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: C.white,
-    marginLeft: 8,
   },
   sectionBadge: {
     backgroundColor: '#00C89622',
-    borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    marginLeft: 8,
+    borderRadius: 999,
   },
   sectionBadgeText: {
     fontSize: 11,
@@ -408,49 +631,45 @@ const styles = StyleSheet.create({
   sectionAction: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   sectionActionText: {
-    fontSize: 13,
+    fontSize: 12,
     color: C.green,
-    marginRight: 4,
+    fontWeight: '600',
   },
-
-  // ── Card Items ──
   cardItem: {
     marginBottom: 10,
   },
-
-  // ── Empty States ──
+  calendarSection: {
+    marginTop: 4,
+  },
   emptyState: {
     backgroundColor: C.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.border,
-    paddingVertical: 36,
+    padding: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   emptyStateTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: C.textSecondary,
-    marginTop: 12,
+    color: C.white,
+    marginTop: 10,
   },
   emptyStateSubtitle: {
     fontSize: 12,
-    color: C.textMuted,
+    color: C.textSecondary,
     marginTop: 4,
   },
   emptyText: {
-    fontSize: 14,
-    color: C.textMuted,
+    color: C.textSecondary,
     textAlign: 'center',
-    paddingVertical: 20,
   },
-
-  // ── Bottom Spacer ──
   bottomSpacer: {
-    height: 32,
+    height: 24,
   },
 });
