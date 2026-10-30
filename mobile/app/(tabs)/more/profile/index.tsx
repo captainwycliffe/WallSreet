@@ -19,9 +19,9 @@ export default function ProfileScreen() {
   const { user } = useAuthStore();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <Header title="Profile" />
-      <ScrollView style={styles.scroll}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <View style={styles.avatarSection}>
           <View style={styles.avatarCircle}>
             <User size={36} color={C.green} />
@@ -58,7 +58,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   avatarSection: {
     alignItems: 'center',

@@ -40,21 +40,21 @@ export function EAStatusCard({ ea, onRevoke }: EAStatusCardProps) {
             <Cpu size={18} color={C.green} />
           </View>
           <View style={styles.nameBlock}>
-            <Text style={styles.name}>{ea.name}</Text>
-            <Text style={styles.version}>v{ea.version}</Text>
+            <Text style={styles.name} numberOfLines={1}>{ea?.name || 'Expert Advisor'}</Text>
+            <Text style={styles.version} numberOfLines={1}>v{ea?.version || '1.0'}</Text>
           </View>
         </View>
-        <StatusBadge status={ea.status} />
+        <StatusBadge status={ea?.status} />
       </View>
 
       <View style={styles.statsRow}>
-        <View>
+        <View style={styles.statCol}>
           <Text style={styles.statLabel}>Last heartbeat</Text>
-          <Text style={styles.statValue}>{timeAgo(ea.last_heartbeat)}</Text>
+          <Text style={styles.statValue} numberOfLines={1}>{timeAgo(ea?.last_heartbeat)}</Text>
         </View>
-        <View>
+        <View style={styles.statCol}>
           <Text style={styles.statLabel}>Connected since</Text>
-          <Text style={styles.statValue}>{timeAgo(ea.connected_since)}</Text>
+          <Text style={styles.statValue} numberOfLines={1}>{timeAgo(ea?.connected_since)}</Text>
         </View>
       </View>
     </Card>
@@ -74,6 +74,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 8,
   },
   iconCircle: {
     width: 36,
@@ -103,6 +104,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: C.border,
+  },
+  statCol: {
+    flex: 1,
   },
   statLabel: {
     color: C.textSecondary,

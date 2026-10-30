@@ -20,6 +20,10 @@ interface AccountCardProps {
 }
 
 export function AccountCard({ account, isActive, onPress }: AccountCardProps) {
+  const balanceStr = (account?.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const equityStr = (account?.equity ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const eaCount = account?.ea_registrations?.length ?? 0;
+
   return (
     <Card
       onPress={onPress}
@@ -31,10 +35,10 @@ export function AccountCard({ account, isActive, onPress }: AccountCardProps) {
             <Wallet size={18} color={C.green} />
           </View>
           <View style={styles.nameBlock}>
-            <Text style={styles.name}>{account.name}</Text>
-            <Text style={styles.meta}>
-              {account.broker} · {account.account_number} · {account.currency}
-              {account.is_demo ? ' · Demo' : ''}
+            <Text style={styles.name} numberOfLines={1}>{account?.name || 'Account'}</Text>
+            <Text style={styles.meta} numberOfLines={1}>
+              {account?.broker || 'MT5'} · {account?.account_number || '—'} · {account?.currency || 'USD'}
+              {account?.is_demo ? ' · Demo' : ''}
             </Text>
           </View>
         </View>
@@ -46,17 +50,17 @@ export function AccountCard({ account, isActive, onPress }: AccountCardProps) {
       </View>
 
       <View style={styles.statsRow}>
-        <View>
+        <View style={styles.statCol}>
           <Text style={styles.statLabel}>Balance</Text>
-          <Text style={styles.statValue}>${account.balance.toFixed(2)}</Text>
+          <Text style={styles.statValue} numberOfLines={1}>${balanceStr}</Text>
         </View>
-        <View>
+        <View style={styles.statCol}>
           <Text style={styles.statLabel}>Equity</Text>
-          <Text style={styles.statValue}>${account.equity.toFixed(2)}</Text>
+          <Text style={styles.statValue} numberOfLines={1}>${equityStr}</Text>
         </View>
-        <View>
+        <View style={styles.statCol}>
           <Text style={styles.statLabel}>EAs</Text>
-          <Text style={styles.statValue}>{account.ea_registrations.length}</Text>
+          <Text style={styles.statValue}>{eaCount}</Text>
         </View>
       </View>
     </Card>
@@ -106,6 +110,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    marginLeft: 8,
   },
   activeBadgeText: {
     color: C.green,
@@ -119,6 +124,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: C.border,
+  },
+  statCol: {
+    flex: 1,
   },
   statLabel: {
     color: C.textSecondary,

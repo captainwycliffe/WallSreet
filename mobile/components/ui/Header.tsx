@@ -19,14 +19,18 @@ export function Header({ title, subtitle, right }: HeaderProps) {
   const router = useRouter();
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={styles.backButton}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
         <ChevronLeft size={24} color={C.white} />
       </TouchableOpacity>
       <View style={styles.titleBlock}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+        {subtitle && <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>}
       </View>
-      {right}
+      {right ? <View style={styles.rightBlock}>{right}</View> : null}
     </View>
   );
 }
@@ -37,16 +41,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    minHeight: 56,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
   backButton: {
-    marginRight: 8,
-    padding: 4,
-    marginLeft: -4,
+    marginRight: 10,
+    padding: 6,
+    marginLeft: -6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   titleBlock: {
     flex: 1,
+    justifyContent: 'center',
   },
   title: {
     color: C.white,
@@ -57,5 +65,11 @@ const styles = StyleSheet.create({
     color: C.textSecondary,
     fontSize: 12,
     marginTop: 2,
+  },
+  rightBlock: {
+    flexShrink: 0,
+    marginLeft: 12,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
 });

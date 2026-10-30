@@ -3,11 +3,13 @@ import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-nat
 
 interface ButtonProps {
   title: string;
-  onPress: () => void;
+  onPress?: () => void;
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   disabled?: boolean;
+  fullWidth?: boolean;
+  style?: any;
 }
 
 export function Button({
@@ -17,8 +19,11 @@ export function Button({
   size = 'md',
   loading,
   disabled,
+  fullWidth,
+  style,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const isFullWidth = fullWidth !== undefined ? fullWidth : size !== 'sm';
 
   return (
     <TouchableOpacity
@@ -27,15 +32,17 @@ export function Button({
       activeOpacity={0.75}
       style={[
         styles.base,
+        isFullWidth ? styles.fullWidth : styles.inline,
         styles[`variant_${variant}`],
         styles[`size_${size}`],
         isDisabled && styles.disabled,
+        style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={C.indicatorColor[variant]} />
+        <ActivityIndicator color={C.indicatorColor[variant]} size={size === 'sm' ? 'small' : 'small'} />
       ) : (
-        <Text style={[styles.label, styles[`labelColor_${variant}`]]}>{title}</Text>
+        <Text style={[styles.label, styles[`labelSize_${size}`], styles[`labelColor_${variant}`]]}>{title}</Text>
       )}
     </TouchableOpacity>
   );
@@ -58,7 +65,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     borderRadius: 14,
+  },
+  fullWidth: {
     width: '100%',
+  },
+  inline: {
+    alignSelf: 'flex-start',
   },
   disabled: {
     opacity: 0.5,
@@ -81,22 +93,33 @@ const styles = StyleSheet.create({
 
   // Sizes
   size_sm: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
   },
   size_md: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 14,
   },
   size_lg: {
-    paddingVertical: 20,
-    paddingHorizontal: 32,
+    paddingVertical: 18,
+    paddingHorizontal: 28,
+    borderRadius: 16,
   },
 
   // Label base
   label: {
-    fontSize: 15,
     fontWeight: '600',
+  },
+  labelSize_sm: {
+    fontSize: 13,
+  },
+  labelSize_md: {
+    fontSize: 15,
+  },
+  labelSize_lg: {
+    fontSize: 17,
   },
 
   // Label colors per variant

@@ -72,9 +72,16 @@ async def update_position(
     db: AsyncSession = Depends(get_db),
 ):
     from app.repositories.trade_repo import TradeRepository
+    from app.models.account import EARegistrationStatus
+    
+    # Touch EA heartbeat so EA remains ONLINE while active
+    ea.last_heartbeat = datetime.utcnow()
+    ea.status = EARegistrationStatus.ONLINE
+
     repo = TradeRepository(db)
     trade = await repo.get_by_ticket(ticket)
     if not trade:
+        await db.commit()
         return {"status": "not_registered_yet"}
 
     if req.current_price is not None: trade.current_price = req.current_price
@@ -84,6 +91,7 @@ async def update_position(
     profit_val = req.profit if req.profit is not None else req.unrealized_profit
     if profit_val is not None: trade.profit = profit_val
     await repo.update(trade)
+    await db.commit()
     return {"status": "updated"}
 
 @router.post("/position/close")

@@ -8,34 +8,40 @@ interface AccountSummaryProps {
 }
 
 export function AccountSummary({ account }: AccountSummaryProps) {
+  const balance = account?.balance ?? 0;
+  const equity = account?.equity ?? 0;
+  const openPl = account?.open_pl ?? 0;
+  const dailyPl = account?.daily_pl ?? 0;
+  const drawdown = account?.drawdown_pct ?? 0;
+
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
       <View style={styles.row}>
         <MetricCard
           label="Balance"
-          value={account.balance.toFixed(2)}
+          value={balance.toFixed(2)}
           prefix="$"
         />
         <MetricCard
           label="Equity"
-          value={account.equity.toFixed(2)}
+          value={equity.toFixed(2)}
           prefix="$"
         />
         <MetricCard
           label="Open P/L"
-          value={account.open_pl.toFixed(2)}
+          value={openPl.toFixed(2)}
           prefix="$"
-          color={account.open_pl >= 0 ? 'green' : 'red'}
+          color={openPl >= 0 ? 'green' : 'red'}
         />
         <MetricCard
           label="Today P/L"
-          value={account.daily_pl.toFixed(2)}
+          value={dailyPl.toFixed(2)}
           prefix="$"
-          color={account.daily_pl >= 0 ? 'green' : 'red'}
+          color={dailyPl >= 0 ? 'green' : 'red'}
         />
         <MetricCard
           label="Drawdown"
-          value={account.drawdown_pct.toFixed(2)}
+          value={drawdown.toFixed(2)}
           suffix="%"
           color="red"
         />

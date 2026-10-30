@@ -24,11 +24,12 @@ const STATUS_CONFIG: Record<string, { bg: string; color: string; dot?: string }>
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
-  const cfg = STATUS_CONFIG[status] || { bg: "#1C1C28", color: "#8888A8" };
+  const safeStatus = status || 'OFFLINE';
+  const cfg = STATUS_CONFIG[safeStatus] || { bg: "#1C1C28", color: "#8888A8" };
   return (
     <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
       {cfg.dot && <View style={[styles.dot, { backgroundColor: cfg.dot }]} />}
-      <Text style={[styles.text, { color: cfg.color }]}>{status.replace("_", " ")}</Text>
+      <Text style={[styles.text, { color: cfg.color }]}>{safeStatus.replace(/_/g, " ")}</Text>
     </View>
   );
 }

@@ -35,7 +35,6 @@ export default function JournalEntryScreen() {
         return await journalService.getEntry(tradeId);
       } catch (e) {
         return null; // no entry yet — that's a normal, expected state here
-        return null;
       }
     },
   });
@@ -73,12 +72,16 @@ export default function JournalEntryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header
         title={trade ? `${trade.symbol} · ${trade.direction}` : 'Journal Entry'}
         subtitle={trade ? `${(trade.profit || 0) >= 0 ? '+' : ''}$${trade.profit?.toFixed(2) ?? '0.00'} · ${trade.r_multiple?.toFixed(2) ?? '0.00'}R` : undefined}
       />
-      <ScrollView style={styles.scroll}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <LoadingSkeleton height={200} />
@@ -137,7 +140,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
+    paddingBottom: 40,
   },
   loadingContainer: {
     marginTop: 16,

@@ -25,10 +25,11 @@ export default function JournalIndexScreen() {
   const closedTrades = data?.items.filter(t => t.status === 'CLOSED') ?? [];
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <Header title="Trade Journal" subtitle="Add notes and lessons to your closed trades" />
       <ScrollView
         style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
       >
         <View style={styles.content}>
@@ -83,7 +84,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   content: {
     marginTop: 16,

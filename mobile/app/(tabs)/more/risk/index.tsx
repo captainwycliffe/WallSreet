@@ -39,11 +39,16 @@ function ProgressBar({ pct, limitPct }: { pct: number; limitPct: number }) {
 export default function RiskDashboardScreen() {
   const { data, isLoading, isFetching, error, refetch } = useRiskDashboard();
 
+  const dailyLimit = data?.limits?.daily_risk_limit_pct ?? 5.0;
+  const maxDrawdownLimit = data?.limits?.max_drawdown_pct ?? 10.0;
+  const riskPerTradeLimit = data?.limits?.risk_per_trade_pct ?? 2.0;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <Header title="Risk Dashboard" subtitle="Live exposure and limit tracking" />
       <ScrollView
         style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
       >
         {isLoading ? (
@@ -56,38 +61,46 @@ export default function RiskDashboardScreen() {
         ) : data ? (
           <>
             <View style={styles.metricsGrid}>
-              <MetricCard label="Open Risk" value={`${data.open_risk_pct.toFixed(1)}%`} />
-              <MetricCard label="Today's Risk" value={`${data.daily_risk_pct.toFixed(1)}%`} />
-              <MetricCard
-                label="Daily P/L"
-                value={`${data.daily_pl >= 0 ? '+' : ''}$${data.daily_pl.toFixed(2)}`}
-                color={data.daily_pl >= 0 ? 'green' : 'red'}
-              />
-              <MetricCard label="Exposure" value={`${data.total_exposure_pct.toFixed(1)}%`} />
+              <View style={styles.metricItem}>
+                <MetricCard label="Open Risk" value={`${(data.open_risk_pct ?? 0).toFixed(1)}%`} />
+              </View>
+              <View style={styles.metricItem}>
+                <MetricCard label="Today's Risk" value={`${(data.daily_risk_pct ?? 0).toFixed(1)}%`} />
+              </View>
+              <View style={styles.metricItem}>
+                <MetricCard
+                  label="Daily P/L"
+                  value={`${(data.daily_pl ?? 0) >= 0 ? '+' : ''}$${(data.daily_pl ?? 0).toFixed(2)}`}
+                  color={(data.daily_pl ?? 0) >= 0 ? 'green' : 'red'}
+                />
+              </View>
+              <View style={styles.metricItem}>
+                <MetricCard label="Exposure" value={`${(data.total_exposure_pct ?? 0).toFixed(1)}%`} />
+              </View>
             </View>
 
             <Card style={styles.limitCard}>
               <Text style={styles.limitTitle}>Daily risk limit</Text>
               <Text style={styles.limitSubtitle}>
-                {data.daily_risk_pct.toFixed(1)}% of {data.limits.daily_risk_limit_pct}% max
+                {(data.daily_risk_pct ?? 0).toFixed(1)}% of {dailyLimit}% max
               </Text>
-              <ProgressBar pct={data.daily_risk_pct} limitPct={data.limits.daily_risk_limit_pct} />
+              <ProgressBar pct={data.daily_risk_pct ?? 0} limitPct={dailyLimit} />
             </Card>
 
             <Card style={styles.limitCard}>
               <Text style={styles.limitTitle}>Drawdown</Text>
               <Text style={styles.limitSubtitle}>
-                {data.daily_drawdown_pct.toFixed(1)}% of {data.limits.max_drawdown_pct}% max (max seen: {data.max_drawdown_pct.toFixed(1)}%)
+                {(data.daily_drawdown_pct ?? 0).toFixed(1)}% of {maxDrawdownLimit}% max (max seen: {(data.max_drawdown_pct ?? 0).toFixed(1)}%)
               </Text>
-              <ProgressBar pct={data.daily_drawdown_pct} limitPct={data.limits.max_drawdown_pct} />
+              <ProgressBar pct={data.daily_drawdown_pct ?? 0} limitPct={maxDrawdownLimit} />
             </Card>
 
             <Card style={styles.limitCard}>
               <Text style={styles.limitTitle}>Risk per trade</Text>
               <Text style={styles.limitSubtitle}>
-                {data.risk_per_trade_pct.toFixed(1)}% of {data.limits.risk_per_trade_pct}% target
+                {(data.risk_per_trade_pct ?? 0).toFixed(1)}% of {riskPerTradeLimit}% target
               </Text>
-              <ProgressBar pct={data.risk_per_trade_pct} limitPct={data.limits.risk_per_trade_pct} />
+              <ProgressBar pct={data.risk_per_trade_pct ?? 0} limitPct={riskPerTradeLimit} />
             </Card>
 
             <Text style={styles.warningSectionTitle}>Warnings</Text>
@@ -125,7 +138,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   skeletonWrapper: {
     marginTop: 24,
@@ -136,9 +152,13 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     marginTop: 16,
-    marginBottom: 24,
-    gap: 12,
+    marginBottom: 12,
+  },
+  metricItem: {
+    width: '48%',
+    marginBottom: 12,
   },
   limitCard: {
     marginBottom: 16,

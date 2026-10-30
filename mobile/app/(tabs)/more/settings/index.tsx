@@ -43,9 +43,9 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <Header title="Settings" subtitle="App preferences" />
-      <ScrollView style={styles.scroll}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <Card style={styles.cardFirst}>
           <View style={styles.row}>
             <View style={styles.rowText}>
@@ -79,7 +79,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   cardFirst: {
     marginTop: 16,

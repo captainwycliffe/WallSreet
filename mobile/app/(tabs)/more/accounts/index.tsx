@@ -55,7 +55,7 @@ export default function AccountsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <Header
         title="Accounts"
         subtitle="Your connected MT5 accounts"
@@ -65,6 +65,7 @@ export default function AccountsScreen() {
       />
       <ScrollView
         style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={C.green} />}
       >
         {showForm && (
@@ -151,7 +152,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   formCard: {
     marginTop: 16,
