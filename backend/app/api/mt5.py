@@ -1,17 +1,34 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update, select
 from app.db.session import get_session
 from app.core.dependencies import get_ea_from_api_key, RateLimiter, get_db
-from app.models.account import EARegistration
+from app.models.account import EARegistration, MT5Account, EARegistrationStatus
+from app.models.poi import POI, POIStatus
+from app.models.trade import Trade, TradeStatus
 from app.schemas.poi import POICreate, POIResponse, POIUpdate
 from app.schemas.trade import TradeCreate, TradeResponse, TradeUpdate, TradeClose
 from app.schemas.event import HeartbeatPayload
 from app.services.poi_service import POIService
 from app.services.trade_service import TradeService
+from app.services.notification_service import NotificationService
 from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/mt5", tags=["mt5"])
 limiter = RateLimiter(requests=120, window=60)
+
+class NearEntryAlertRequest(BaseModel):
+    ticket: int
+    symbol: str
+    direction: str
+    entry_price: float
+    current_price: float
+    distance: float
 
 @router.post("/heartbeat")
 async def heartbeat(
@@ -19,8 +36,6 @@ async def heartbeat(
     ea: EARegistration = Depends(get_ea_from_api_key),
     db: AsyncSession = Depends(get_db)
 ):
-    from sqlalchemy import update, select
-    from app.models.account import MT5Account, EARegistrationStatus
     now = datetime.utcnow()
 
     await db.execute(
@@ -43,9 +58,8 @@ async def heartbeat(
         if payload.free_margin is not None: acc.free_margin = payload.free_margin
         if payload.open_pl is not None: acc.open_pl = payload.open_pl
 
-    # Auto-reconcile open positions with live MT5 tickets
+    # 1. Auto-reconcile open positions with live MT5 tickets
     if payload.open_tickets is not None:
-        from app.models.trade import Trade, TradeStatus
         trades_res = await db.execute(
             select(Trade).where(
                 Trade.account_id == ea.account_id,
@@ -59,6 +73,31 @@ async def heartbeat(
                 if not t.closed_at:
                     t.closed_at = now
 
+    # 2. Auto-reconcile pending orders (remove expired/cancelled orders)
+    if payload.pending_tickets is not None:
+        pois_res = await db.execute(
+            select(POI).where(
+                POI.account_id == ea.account_id,
+                POI.status == POIStatus.PENDING
+            )
+        )
+        current_pending = pois_res.scalars().all()
+        for p in current_pending:
+            order_ticket = None
+            if p.metadata_data and isinstance(p.metadata_data, dict):
+                order_ticket = p.metadata_data.get("mt5_order_ticket")
+            elif p.idempotency_key and p.idempotency_key.startswith("order_poi_"):
+                try:
+                    order_ticket = int(p.idempotency_key.replace("order_poi_", ""))
+                except Exception:
+                    pass
+
+            # If order ticket was tracked and is no longer pending in MT5, mark EXPIRED
+            if order_ticket and order_ticket not in payload.pending_tickets:
+                p.status = POIStatus.EXPIRED
+                if not p.closed_at:
+                    p.closed_at = now
+
     await db.commit()
     return {"status": "ok"}
 
@@ -70,6 +109,59 @@ async def create_poi(
 ):
     service = POIService(db)
     return await service.create_poi(ea.account_id, ea.id, req)
+
+@router.post("/order/delete")
+async def delete_order(
+    ticket: int,
+    ea: EARegistration = Depends(get_ea_from_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a cancelled or expired pending order as EXPIRED."""
+    idem_key = f"order_poi_{ticket}"
+    res = await db.execute(
+        select(POI).where(
+            POI.account_id == ea.account_id,
+            POI.status == POIStatus.PENDING
+        )
+    )
+    pois = res.scalars().all()
+    count = 0
+    now = datetime.utcnow()
+    for p in pois:
+        meta_ticket = None
+        if p.metadata_data and isinstance(p.metadata_data, dict):
+            meta_ticket = p.metadata_data.get("mt5_order_ticket")
+        if p.idempotency_key == idem_key or meta_ticket == ticket:
+            p.status = POIStatus.EXPIRED
+            p.closed_at = now
+            count += 1
+
+    await db.commit()
+    return {"status": "expired", "ticket": ticket, "count": count}
+
+@router.post("/alert/near-entry")
+async def alert_near_entry(
+    req: NearEntryAlertRequest,
+    ea: EARegistration = Depends(get_ea_from_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send near-entry notification when current price approaches entry."""
+    acc_res = await db.execute(select(MT5Account).where(MT5Account.id == ea.account_id))
+    acc = acc_res.scalar_one_or_none()
+    if acc:
+        notif_service = NotificationService(db)
+        curr_str = f"{req.current_price:.2f}" if req.current_price > 100 else f"{req.current_price:.5f}"
+        entry_str = f"{req.entry_price:.2f}" if req.entry_price > 100 else f"{req.entry_price:.5f}"
+        title = "⚠️ Price Alert: Near Entry"
+        body = f"{req.symbol} is near your {req.direction} entry! Current: {curr_str} (Entry: {entry_str})"
+        await notif_service.send_to_user(
+            user_id=acc.user_id,
+            notif_type="PRICE_NEAR_ENTRY",
+            title=title,
+            body=body,
+            data={"ticket": req.ticket, "symbol": req.symbol, "current_price": req.current_price, "entry_price": req.entry_price}
+        )
+    return {"status": "alert_sent"}
 
 @router.post("/position/open", response_model=TradeResponse)
 async def open_position(
@@ -88,7 +180,6 @@ async def update_position(
     db: AsyncSession = Depends(get_db),
 ):
     from app.repositories.trade_repo import TradeRepository
-    from app.models.account import EARegistrationStatus
     
     # Touch EA heartbeat so EA remains ONLINE while active
     ea.last_heartbeat = datetime.utcnow()
@@ -100,7 +191,6 @@ async def update_position(
         await db.commit()
         return {"status": "not_registered_yet"}
 
-    from app.models.trade import TradeStatus
     trade.status = TradeStatus.OPEN
     if req.current_price is not None: trade.current_price = req.current_price
     if req.stop_loss is not None: trade.stop_loss = req.stop_loss
@@ -120,7 +210,6 @@ async def close_position(
     db: AsyncSession = Depends(get_db),
 ):
     from app.repositories.trade_repo import TradeRepository
-    from app.models.trade import TradeStatus
     repo = TradeRepository(db)
     trade = await repo.get_by_ticket(ticket)
     if not trade:

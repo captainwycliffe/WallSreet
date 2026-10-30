@@ -46,6 +46,7 @@ class AccountResponse(BaseModel):
     free_margin: float
     open_pl: float
     daily_pl: float
+    weekly_pl: float = 0.0
     drawdown_pct: float
     is_active: bool
     is_demo: bool

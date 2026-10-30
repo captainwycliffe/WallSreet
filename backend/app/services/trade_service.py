@@ -1,14 +1,23 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models.trade import Trade, TradeStatus, TradeDirection
+from app.models.account import MT5Account
+from app.models.poi import POI, POIStatus
 from app.schemas.trade import TradeCreate, TradeUpdate, TradeClose
 from app.repositories.trade_repo import TradeRepository
+from app.services.notification_service import NotificationService
 from app.events.bus import event_bus
 from app.core.exceptions import NotFoundError
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TradeService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = TradeRepository(db)
+        self.notif_service = NotificationService(db)
 
     def calculate_r_multiple(self, entry: float, sl: float, exit: float, direction: TradeDirection) -> float:
         if direction == TradeDirection.BUY:
@@ -54,5 +63,55 @@ class TradeService:
             "trade_id": trade.id,
             "ticket": trade.mt5_ticket
         })
+
+        # Check if this trade activated a pending POI limit order
+        try:
+            acc_res = await self.db.execute(select(MT5Account).where(MT5Account.id == account_id))
+            acc = acc_res.scalar_one_or_none()
+            if acc:
+                # Find matching pending POI for this symbol
+                poi_res = await self.db.execute(
+                    select(POI).where(
+                        POI.account_id == account_id,
+                        POI.symbol == trade.symbol,
+                        POI.status == POIStatus.PENDING
+                    )
+                )
+                pending_pois = poi_res.scalars().all()
+                activated_poi = None
+                for p in pending_pois:
+                    p_entry = float(p.entry_price)
+                    t_entry = float(trade.entry_price)
+                    threshold = 1.0 if ("XAU" in trade.symbol or "GOLD" in trade.symbol) else 0.0010
+                    if abs(p_entry - t_entry) <= threshold:
+                        activated_poi = p
+                        p.status = POIStatus.ACTIVE
+                        p.activated_at = datetime.utcnow()
+                        trade.poi_id = p.id
+                        break
+
+                entry_val = float(trade.entry_price)
+                price_str = f"{entry_val:.2f}" if entry_val > 100 else f"{entry_val:.5f}"
+
+                if activated_poi:
+                    # Send limit activated notification
+                    await self.notif_service.send_to_user(
+                        user_id=acc.user_id,
+                        notif_type="LIMIT_ACTIVATED",
+                        title="⚡ Limit Order Activated",
+                        body=f"{trade.symbol} limit filled at {price_str} ({trade.volume} lots)",
+                        data={"trade_id": trade.id, "ticket": trade.mt5_ticket, "symbol": trade.symbol}
+                    )
+                else:
+                    # Send trade opened notification
+                    await self.notif_service.send_to_user(
+                        user_id=acc.user_id,
+                        notif_type="TRADE_OPENED",
+                        title="📈 Trade Activated",
+                        body=f"{trade.symbol} {trade.direction.value} {trade.volume} lots opened @ {price_str}",
+                        data={"trade_id": trade.id, "ticket": trade.mt5_ticket, "symbol": trade.symbol}
+                    )
+        except Exception as e:
+            logger.warning("Failed to send trade opened / limit activated notification: %s", e)
         
         return trade

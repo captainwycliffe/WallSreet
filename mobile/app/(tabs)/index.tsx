@@ -67,7 +67,7 @@ export default function DashboardScreen() {
   const trades = tradesData?.items || [];
 
   const activeTrades = trades.filter((t) => t.status === 'OPEN');
-  const pendingOrders = pois.filter((p) => p.status === 'PENDING' || p.status === 'ACTIVE');
+  const pendingOrders = pois.filter((p) => p.status === 'PENDING');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -137,6 +137,17 @@ export default function DashboardScreen() {
                 ]}>
                   {(account.daily_pl ?? 0) >= 0 ? '+' : ''}
                   ${Number(account.daily_pl ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+              <View style={styles.metricDivider} />
+              <View style={styles.accountMetric}>
+                <Text style={styles.accountMetricLabel}>Weekly P/L</Text>
+                <Text style={[
+                  styles.accountMetricValue,
+                  { color: (account.weekly_pl ?? 0) >= 0 ? C.green : C.red },
+                ]}>
+                  {(account.weekly_pl ?? 0) >= 0 ? '+' : ''}
+                  ${Number(account.weekly_pl ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
             </View>

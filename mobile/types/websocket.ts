@@ -4,6 +4,7 @@ export type WSEventType =
   | 'SL_HIT' | 'TP_HIT'
   | 'EA_ONLINE' | 'EA_OFFLINE'
   | 'ACCOUNT_UPDATED' | 'RISK_WARNING'
+  | 'NOTIFICATION'
   | 'CONNECTED' | 'PING' | 'PONG';
 
 export interface WSMessage {

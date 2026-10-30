@@ -31,6 +31,9 @@ private:
    datetime m_last_heartbeat;
    datetime m_last_position_update;
    int      m_update_interval_secs;
+   datetime m_last_near_entry_check;
+   datetime m_last_alert_time;
+   ulong    m_last_alert_ticket;
 
    string BuildAuthHeader()
    {
@@ -102,10 +105,23 @@ private:
       }
       tickets_json += "]";
 
+      string pending_tickets_json = "[";
+      int orders = OrdersTotal();
+      for(int i = 0; i < orders; i++)
+      {
+         ulong ot = OrderGetTicket(i);
+         if(ot > 0)
+         {
+            if(StringLen(pending_tickets_json) > 1) pending_tickets_json += ",";
+            pending_tickets_json += IntegerToString(ot);
+         }
+      }
+      pending_tickets_json += "]";
+
       string json = StringFormat(
-         "{\"timestamp\":\"%s\",\"version\":\"1.4.2\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"margin\":%.2f,\"free_margin\":%.2f,\"open_pl\":%.2f,\"open_positions\":%d,\"open_tickets\":%s}",
+         "{\"timestamp\":\"%s\",\"version\":\"1.4.2\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"margin\":%.2f,\"free_margin\":%.2f,\"open_pl\":%.2f,\"open_positions\":%d,\"open_tickets\":%s,\"pending_tickets\":%s}",
          TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS),
-         balance, equity, margin, free_m, open_pl, positions, tickets_json
+         balance, equity, margin, free_m, open_pl, positions, tickets_json, pending_tickets_json
       );
 
       string response;
@@ -257,6 +273,54 @@ public:
       return true;
    }
 
+   void CheckPriceNearEntry()
+   {
+      datetime now = TimeCurrent();
+      if(now - m_last_near_entry_check < 5) return; // Check every 5 seconds
+      m_last_near_entry_check = now;
+
+      int total = OrdersTotal();
+      for(int i = 0; i < total; i++)
+      {
+         ulong ticket = OrderGetTicket(i);
+         if(ticket == 0 || !OrderSelect(ticket)) continue;
+
+         ENUM_ORDER_TYPE otype = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+         string dir = "BUY";
+         if(otype == ORDER_TYPE_SELL_LIMIT || otype == ORDER_TYPE_SELL_STOP || otype == ORDER_TYPE_SELL_STOP_LIMIT)
+            dir = "SELL";
+
+         string symbol   = OrderGetString(ORDER_SYMBOL);
+         double entry    = OrderGetDouble(ORDER_PRICE_OPEN);
+         double point    = SymbolInfoDouble(symbol, SYMBOL_POINT);
+         double bid      = SymbolInfoDouble(symbol, SYMBOL_BID);
+         double ask      = SymbolInfoDouble(symbol, SYMBOL_ASK);
+         double current  = (dir == "BUY") ? ask : bid;
+         double diff     = MathAbs(current - entry);
+
+         // Threshold: Gold <= $1.50 (150 pts), FX <= 70 pts (7 pips)
+         double threshold = (StringFind(symbol, "XAU") >= 0 || StringFind(symbol, "GOLD") >= 0) ? 1.50 : (point * 70);
+
+         if(diff <= threshold && diff > 0)
+         {
+            // Throttle alert per ticket: at most once every 600 seconds (10 mins)
+            if(now - m_last_alert_time >= 600 || m_last_alert_ticket != ticket)
+            {
+               m_last_alert_ticket = ticket;
+               m_last_alert_time   = now;
+
+               string json = StringFormat(
+                  "{\"ticket\":%llu,\"symbol\":\"%s\",\"direction\":\"%s\",\"entry_price\":%.5f,\"current_price\":%.5f,\"distance\":%.5f}",
+                  ticket, JsonEscape(symbol), dir, entry, current, diff
+               );
+               string resp;
+               SendHTTPPost("/api/mt5/alert/near-entry", json, resp);
+               if(m_debug) PrintFormat("[MT5Adapter] Near-entry alert sent: %s %s @ %.2f (Current: %.2f)", symbol, dir, entry, current);
+            }
+         }
+      }
+   }
+
    void OnTick()
    {
       datetime now = TimeCurrent();
@@ -267,6 +331,7 @@ public:
          m_last_heartbeat = now;
       }
       CheckPositionUpdates();
+      CheckPriceNearEntry();
    }
 
    void OnDeinit()
@@ -461,7 +526,13 @@ public:
          }
       }
 
-      if(trans.type == TRADE_TRANSACTION_ORDER_ADD || trans.type == TRADE_TRANSACTION_ORDER_DELETE)
+      if(trans.type == TRADE_TRANSACTION_ORDER_DELETE)
+      {
+         string res;
+         SendHTTPPost("/api/mt5/order/delete?ticket=" + IntegerToString(trans.order), "{}", res);
+         SyncPendingOrders();
+      }
+      else if(trans.type == TRADE_TRANSACTION_ORDER_ADD)
       {
          SyncPendingOrders();
       }

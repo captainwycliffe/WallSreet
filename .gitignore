@@ -7,3 +7,5 @@
 .env
 node_modules/
 .expo/
+scratch/
+.claude/
