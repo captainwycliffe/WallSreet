@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import String, ForeignKey, Enum, DateTime, JSON, Boolean
 from app.db.base import Base, UUIDMixin, TimestampMixin
+from app.models.user import User  # noqa: F401
 import enum
 from typing import Optional
 from datetime import datetime
