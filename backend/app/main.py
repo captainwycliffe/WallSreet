@@ -35,6 +35,15 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database tables verified")
 
+    # Ensure default user, account and EA registration exist
+    try:
+        from app.db.seed import ensure_initial_user_and_ea
+        from app.db.session import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            await ensure_initial_user_and_ea(session)
+    except Exception as e:
+        logger.warning("User/EA initialization warning: %s", e)
+
     # Seed demo data if enabled
     if settings.SEED_DEMO_DATA:
         try:

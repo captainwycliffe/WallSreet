@@ -29,6 +29,58 @@ def utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
 
+async def ensure_initial_user_and_ea(session: AsyncSession) -> None:
+    """Ensure the primary user, MT5 account, and EA registration exist on startup."""
+    user_res = await session.execute(select(User).limit(1))
+    if user_res.scalar_one_or_none():
+        return
+
+    logger.info("Initializing primary user, MT5 account, and EA registration...")
+    user = User(
+        id="25b2dabb-d34e-4c6c-b249-84035f9fd040",
+        email="captainwycliffe@gmail.com",
+        username="wycliffe yegon",
+        password_hash=hash_password("demo1234"),
+        is_active=True,
+        is_superuser=False,
+    )
+    session.add(user)
+    await session.flush()
+
+    acc = MT5Account(
+        id="31864e82-c71d-4638-bfa5-187fe344f811",
+        user_id=user.id,
+        name="Main Account",
+        broker="FTMO",
+        account_number="98765432",
+        currency="USD",
+        balance=Decimal("17489.15"),
+        equity=Decimal("17489.15"),
+        margin=Decimal("0.00"),
+        free_margin=Decimal("17489.15"),
+        open_pl=Decimal("0.00"),
+        daily_pl=Decimal("0.00"),
+        drawdown_pct=Decimal("0.00"),
+        is_active=True,
+        is_demo=False,
+    )
+    session.add(acc)
+    await session.flush()
+
+    ea = EARegistration(
+        id="85f185f1-897e-464d-8389-b14fa8e94956",
+        account_id=acc.id,
+        name="DailyCodeMethod_Multi",
+        version="1.4.2",
+        api_key=hash_api_key("mt5ea_demo_key_12345"),
+        status=EARegistrationStatus.OFFLINE,
+        is_active=True,
+    )
+    session.add(ea)
+    await session.commit()
+    logger.info("Primary user, account, and EA registration initialized.")
+
+
 async def seed_demo_data(session: AsyncSession) -> None:
     """Disabled: live data from MT5 only."""
     return
