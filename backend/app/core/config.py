@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     GOLD_COT_INTERVAL_HOURS: int = 6
 
     # Demo / Seed
-    DEMO_MODE: bool = True
-    SEED_DEMO_DATA: bool = True
+    DEMO_MODE: bool = False
+    SEED_DEMO_DATA: bool = False
 
     # Logging
     LOG_LEVEL: str = "INFO"

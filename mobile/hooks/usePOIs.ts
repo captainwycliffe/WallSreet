@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { poisService } from '../services/api';
-import { mockPOIs } from '../services/mockData';
 
 export function usePOIs(filters?: Record<string, any>) {
   return useQuery({

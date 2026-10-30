@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { User, LoginRequest, RegisterRequest } from '../types/auth';
 import { authService } from '../services/api';
 import { storage } from '../services/storage';
-import { mockUser } from '../services/mockData';
 
 interface AuthState {
   user: User | null;
@@ -28,12 +27,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       const user = await authService.getMe();
       set({ user, isAuthenticated: true });
     } catch (error) {
-      // Fallback only if offline demo
-      if (email === 'demo@mt5app.com' && password === 'demo1234') {
-        console.warn('Backend unreachable, logging in with offline demo mode');
-        set({ user: mockUser as User, isAuthenticated: true });
-        return;
-      }
       throw error;
     }
   },

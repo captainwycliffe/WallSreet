@@ -2,8 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { accountsService } from '../services/api';
 import { useAccountStore } from '../store/accountStore';
 import { useEffect } from 'react';
-import { mockAccount } from '../services/mockData';
-
 export function useAccounts() {
   const setAccounts = useAccountStore(s => s.setAccounts);
   
@@ -12,11 +10,10 @@ export function useAccounts() {
     queryFn: async () => {
       try {
         const data = await accountsService.getAccounts();
-        setAccounts(data);
-        return data;
+        setAccounts(data || []);
+        return data || [];
       } catch (e) {
-        setAccounts([mockAccount]);
-        return [mockAccount];
+        return [];
       }
     },
   });

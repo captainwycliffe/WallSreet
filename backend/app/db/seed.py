@@ -30,18 +30,8 @@ def utc(dt: datetime) -> datetime:
 
 
 async def seed_demo_data(session: AsyncSession) -> None:
-    """
-    Idempotent seed — skips if demo user already exists.
-    """
-    existing = await session.execute(
-        select(User).where(User.email == "demo@mt5app.com")
-    )
-    if existing.scalar_one_or_none():
-        logger.info("Demo data already seeded — skipping")
-        return
-
-    logger.info("Seeding demo data...")
-    now = datetime.now(timezone.utc)
+    """Disabled: live data from MT5 only."""
+    return
 
     # ─── User ─────────────────────────────────────────────────────────────────
     user = User(

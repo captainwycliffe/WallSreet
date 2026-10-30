@@ -100,6 +100,8 @@ async def update_position(
         await db.commit()
         return {"status": "not_registered_yet"}
 
+    from app.models.trade import TradeStatus
+    trade.status = TradeStatus.OPEN
     if req.current_price is not None: trade.current_price = req.current_price
     if req.stop_loss is not None: trade.stop_loss = req.stop_loss
     if req.take_profit is not None: trade.take_profit = req.take_profit

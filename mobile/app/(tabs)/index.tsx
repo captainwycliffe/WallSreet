@@ -182,11 +182,11 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* ── EA Pending Orders & Limits Section ── */}
+        {/* ── Pending Orders Section ── */}
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
           <View style={styles.sectionHeaderLeft}>
             <Target size={18} color={C.amber} />
-            <Text style={styles.sectionTitle}>EA Pending Orders & Limits</Text>
+            <Text style={styles.sectionTitle}>Pending Orders</Text>
             <View style={[styles.sectionBadge, { backgroundColor: '#FFB80022' }]}>
               <Text style={[styles.sectionBadgeText, { color: C.amber }]}>{pendingOrders.length}</Text>
             </View>
@@ -203,7 +203,7 @@ export default function DashboardScreen() {
           <View style={styles.emptyState}>
             <Target size={28} color={C.textMuted} />
             <Text style={styles.emptyStateTitle}>No Pending Orders</Text>
-            <Text style={styles.emptyStateSubtitle}>Limit orders and pending zones set by EA will appear here</Text>
+            <Text style={styles.emptyStateSubtitle}>Live pending orders placed by your EA will appear here</Text>
           </View>
         )}
 

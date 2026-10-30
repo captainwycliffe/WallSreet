@@ -44,11 +44,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleDemoMode = () => {
-    setEmail('demo@mt5app.com');
-    setPassword('demo1234');
-  };
-
   return (
     <View style={styles.container}>
       {/* Logo / Title Area */}
@@ -96,16 +91,6 @@ export default function LoginScreen() {
             <Text style={styles.loginButtonText}>Login</Text>
           )}
         </TouchableOpacity>
-
-        {/* Demo Mode Button */}
-        <TouchableOpacity
-          style={styles.demoButton}
-          onPress={handleDemoMode}
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.demoButtonText}>Demo Mode</Text>
-        </TouchableOpacity>
       </View>
 
       <Text style={styles.footer}>Secure · Real-time · Professional</Text>
@@ -126,28 +111,29 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logoDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 999,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: C.green,
     marginBottom: 16,
     shadowColor: C.green,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: 10,
+    elevation: 8,
   },
   title: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '800',
     color: C.white,
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
     color: C.textSecondary,
-    letterSpacing: 0.3,
+    fontWeight: '500',
+    letterSpacing: 0.5,
   },
   card: {
     width: '100%',
@@ -156,17 +142,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     padding: 24,
+    marginBottom: 24,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
     color: C.textSecondary,
     marginBottom: 8,
-    letterSpacing: 0.4,
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   labelSpacing: {
-    marginTop: 20,
+    marginTop: 18,
   },
   input: {
     backgroundColor: C.surface2,
@@ -179,17 +166,12 @@ const styles = StyleSheet.create({
     color: C.white,
   },
   loginButton: {
+    marginTop: 24,
     backgroundColor: C.green,
-    borderRadius: 16,
-    paddingVertical: 15,
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 28,
-    shadowColor: C.green,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
   },
   loginButtonDisabled: {
     opacity: 0.6,
@@ -198,27 +180,11 @@ const styles = StyleSheet.create({
     color: C.white,
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  demoButton: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.green,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  demoButtonText: {
-    color: C.green,
-    fontSize: 15,
-    fontWeight: '600',
     letterSpacing: 0.3,
   },
   footer: {
-    marginTop: 32,
     fontSize: 12,
     color: C.textMuted,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 });

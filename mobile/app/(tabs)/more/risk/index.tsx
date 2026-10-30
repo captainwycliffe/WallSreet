@@ -39,13 +39,13 @@ function ProgressBar({ pct, limitPct }: { pct: number; limitPct: number }) {
 export default function RiskDashboardScreen() {
   const { data, isLoading, isFetching, error, refetch } = useRiskDashboard();
 
-  const dailyLimit = data?.limits?.daily_risk_limit_pct ?? 5.0;
-  const maxDrawdownLimit = data?.limits?.max_drawdown_pct ?? 10.0;
-  const riskPerTradeLimit = data?.limits?.risk_per_trade_pct ?? 2.0;
+  const dailyLimit = data?.limits?.daily_risk_limit_pct;
+  const maxDrawdownLimit = data?.limits?.max_drawdown_pct;
+  const riskPerTradeLimit = data?.limits?.risk_per_trade_pct;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <Header title="Risk Dashboard" subtitle="Live exposure and limit tracking" />
+      <Header title="Risk Dashboard" subtitle="Live exposure and risk tracking" />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -79,29 +79,35 @@ export default function RiskDashboardScreen() {
               </View>
             </View>
 
-            <Card style={styles.limitCard}>
-              <Text style={styles.limitTitle}>Daily risk limit</Text>
-              <Text style={styles.limitSubtitle}>
-                {(data.daily_risk_pct ?? 0).toFixed(1)}% of {dailyLimit}% max
-              </Text>
-              <ProgressBar pct={data.daily_risk_pct ?? 0} limitPct={dailyLimit} />
-            </Card>
+            {dailyLimit != null && (
+              <Card style={styles.limitCard}>
+                <Text style={styles.limitTitle}>Daily Risk</Text>
+                <Text style={styles.limitSubtitle}>
+                  {(data.daily_risk_pct ?? 0).toFixed(1)}% / {dailyLimit}% limit
+                </Text>
+                <ProgressBar pct={data.daily_risk_pct ?? 0} limitPct={dailyLimit} />
+              </Card>
+            )}
 
-            <Card style={styles.limitCard}>
-              <Text style={styles.limitTitle}>Drawdown</Text>
-              <Text style={styles.limitSubtitle}>
-                {(data.daily_drawdown_pct ?? 0).toFixed(1)}% of {maxDrawdownLimit}% max (max seen: {(data.max_drawdown_pct ?? 0).toFixed(1)}%)
-              </Text>
-              <ProgressBar pct={data.daily_drawdown_pct ?? 0} limitPct={maxDrawdownLimit} />
-            </Card>
+            {maxDrawdownLimit != null && (
+              <Card style={styles.limitCard}>
+                <Text style={styles.limitTitle}>Drawdown</Text>
+                <Text style={styles.limitSubtitle}>
+                  {(data.daily_drawdown_pct ?? 0).toFixed(1)}% / {maxDrawdownLimit}% limit (max seen: {(data.max_drawdown_pct ?? 0).toFixed(1)}%)
+                </Text>
+                <ProgressBar pct={data.daily_drawdown_pct ?? 0} limitPct={maxDrawdownLimit} />
+              </Card>
+            )}
 
-            <Card style={styles.limitCard}>
-              <Text style={styles.limitTitle}>Risk per trade</Text>
-              <Text style={styles.limitSubtitle}>
-                {(data.risk_per_trade_pct ?? 0).toFixed(1)}% of {riskPerTradeLimit}% target
-              </Text>
-              <ProgressBar pct={data.risk_per_trade_pct ?? 0} limitPct={riskPerTradeLimit} />
-            </Card>
+            {riskPerTradeLimit != null && (
+              <Card style={styles.limitCard}>
+                <Text style={styles.limitTitle}>Risk Per Trade</Text>
+                <Text style={styles.limitSubtitle}>
+                  {(data.risk_per_trade_pct ?? 0).toFixed(1)}% / {riskPerTradeLimit}% target
+                </Text>
+                <ProgressBar pct={data.risk_per_trade_pct ?? 0} limitPct={riskPerTradeLimit} />
+              </Card>
+            )}
 
             <Text style={styles.warningSectionTitle}>Warnings</Text>
             {data.warnings.length === 0 ? (
