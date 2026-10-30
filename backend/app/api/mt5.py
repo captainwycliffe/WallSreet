@@ -43,6 +43,22 @@ async def heartbeat(
         if payload.free_margin is not None: acc.free_margin = payload.free_margin
         if payload.open_pl is not None: acc.open_pl = payload.open_pl
 
+    # Auto-reconcile open positions with live MT5 tickets
+    if payload.open_tickets is not None:
+        from app.models.trade import Trade, TradeStatus
+        trades_res = await db.execute(
+            select(Trade).where(
+                Trade.account_id == ea.account_id,
+                Trade.status == TradeStatus.OPEN
+            )
+        )
+        current_open = trades_res.scalars().all()
+        for t in current_open:
+            if t.mt5_ticket not in payload.open_tickets:
+                t.status = TradeStatus.CLOSED
+                if not t.closed_at:
+                    t.closed_at = now
+
     await db.commit()
     return {"status": "ok"}
 

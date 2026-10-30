@@ -90,10 +90,22 @@ private:
       double open_pl   = equity - balance;
       int    positions = PositionsTotal();
 
+      string tickets_json = "[";
+      for(int i = 0; i < positions; i++)
+      {
+         ulong t = PositionGetTicket(i);
+         if(t > 0)
+         {
+            if(StringLen(tickets_json) > 1) tickets_json += ",";
+            tickets_json += IntegerToString(t);
+         }
+      }
+      tickets_json += "]";
+
       string json = StringFormat(
-         "{\"timestamp\":\"%s\",\"version\":\"1.4.2\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"margin\":%.2f,\"free_margin\":%.2f,\"open_pl\":%.2f,\"open_positions\":%d}",
+         "{\"timestamp\":\"%s\",\"version\":\"1.4.2\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"margin\":%.2f,\"free_margin\":%.2f,\"open_pl\":%.2f,\"open_positions\":%d,\"open_tickets\":%s}",
          TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS),
-         balance, equity, margin, free_m, open_pl, positions
+         balance, equity, margin, free_m, open_pl, positions, tickets_json
       );
 
       string response;

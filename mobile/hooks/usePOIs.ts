@@ -9,7 +9,7 @@ export function usePOIs(filters?: Record<string, any>) {
       try {
         return await poisService.getPOIs(filters);
       } catch (e) {
-        return { items: mockPOIs, total: mockPOIs.length, page: 1, pages: 1 };
+        return { items: [], total: 0, page: 1, pages: 1 };
       }
     },
   });
@@ -22,7 +22,7 @@ export function usePOI(id: string) {
       try {
         return await poisService.getPOI(id);
       } catch (e) {
-        return mockPOIs.find(p => p.id === id) || null;
+        return null;
       }
     },
   });

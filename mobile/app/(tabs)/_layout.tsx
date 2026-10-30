@@ -32,6 +32,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="pois"
         options={{
+          href: null,
           title: 'POIs',
           tabBarIcon: ({ color }) => <Target size={24} color={color} />,
         }}

@@ -13,6 +13,7 @@ class HeartbeatPayload(MT5EventPayload):
     free_margin: Optional[float] = 0.0
     open_pl: Optional[float] = 0.0
     open_positions: Optional[int] = 0
+    open_tickets: Optional[list[int]] = None
     version: Optional[str] = "1.4.2"
     timestamp: Optional[str] = None
 

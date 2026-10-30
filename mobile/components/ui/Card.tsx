@@ -1,10 +1,10 @@
 import React from "react";
-import { View, TouchableOpacity, StyleSheet, ViewStyle } from "react-native";
+import { View, TouchableOpacity, StyleSheet, ViewStyle, StyleProp } from "react-native";
 
 interface CardProps {
   padding?: boolean;
   onPress?: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }
 

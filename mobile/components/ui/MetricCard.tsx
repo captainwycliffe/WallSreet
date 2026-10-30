@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { Card } from './Card';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
 
@@ -17,7 +17,7 @@ interface MetricCardProps {
   prefix?: string;
   suffix?: string;
   color?: 'default' | 'green' | 'red';
-  style?: object;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function MetricCard({ label, value, changePct, prefix = '', suffix = '', color = 'default', style }: MetricCardProps) {

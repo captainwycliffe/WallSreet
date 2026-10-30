@@ -9,7 +9,7 @@ export function useTrades(filters?: Record<string, any>) {
       try {
         return await tradesService.getTrades(filters);
       } catch (e) {
-        return { items: mockTrades, total: mockTrades.length, page: 1, pages: 1 };
+        return { items: [], total: 0, page: 1, pages: 1 };
       }
     },
   });
@@ -22,7 +22,7 @@ export function useTrade(id: string) {
       try {
         return await tradesService.getTrade(id);
       } catch (e) {
-        return mockTrades.find(t => t.id === id) || null;
+        return null;
       }
     },
   });

@@ -46,11 +46,24 @@ interface WeekSummary {
 interface TradeCalendarProps {
   trades: Trade[];
   onSelectTrade?: (trade: Trade) => void;
+  selectedDate?: string | null;
+  onSelectDate?: (dateStr: string | null) => void;
 }
 
-export function TradeCalendar({ trades, onSelectTrade }: TradeCalendarProps) {
+export function TradeCalendar({
+  trades,
+  onSelectTrade,
+  selectedDate,
+  onSelectDate,
+}: TradeCalendarProps) {
   const [viewDate, setViewDate] = useState(() => new Date());
-  const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
+  const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(null);
+
+  const selectedDateStr = selectedDate !== undefined ? selectedDate : internalSelectedDate;
+  const updateSelectedDate = (val: string | null) => {
+    if (onSelectDate) onSelectDate(val);
+    else setInternalSelectedDate(val);
+  };
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth(); // 0-indexed
@@ -176,19 +189,19 @@ export function TradeCalendar({ trades, onSelectTrade }: TradeCalendarProps) {
   // Navigation handlers
   const handlePrevMonth = () => {
     setViewDate(new Date(year, month - 1, 1));
-    setSelectedDateStr(null);
+    updateSelectedDate(null);
   };
 
   const handleNextMonth = () => {
     setViewDate(new Date(year, month + 1, 1));
-    setSelectedDateStr(null);
+    updateSelectedDate(null);
   };
 
   const handleToday = () => {
     const now = new Date();
     setViewDate(now);
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    setSelectedDateStr(todayStr);
+    updateSelectedDate(todayStr);
   };
 
   const today = new Date();
@@ -260,7 +273,7 @@ export function TradeCalendar({ trades, onSelectTrade }: TradeCalendarProps) {
               <TouchableOpacity
                 key={dateStr}
                 activeOpacity={0.7}
-                onPress={() => setSelectedDateStr(isSelected ? null : dateStr)}
+                onPress={() => updateSelectedDate(isSelected ? null : dateStr)}
                 style={[
                   styles.dayCell,
                   hasTrades && (isProfit ? styles.dayCellProfit : styles.dayCellLoss),

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -13,20 +13,14 @@ import { useAuthStore } from '../../store/authStore';
 import { useAccounts } from '../../hooks/useAccount';
 import { usePOIs } from '../../hooks/usePOIs';
 import { useTrades } from '../../hooks/useTrades';
-import { useRiskDashboard } from '../../hooks/useRisk';
 import { useQuery } from '@tanstack/react-query';
 import { eaService } from '../../services/api';
 import { TradeCard } from '../../components/trade/TradeCard';
-import { TradeCalendar } from '../../components/trade/TradeCalendar';
 import { POICard } from '../../components/poi/POICard';
 import {
   ArrowRight,
   TrendingUp,
   Target,
-  ShieldAlert,
-  Calendar as CalendarIcon,
-  AlertTriangle,
-  ChevronRight,
 } from 'lucide-react-native';
 
 const C = {
@@ -38,42 +32,18 @@ const C = {
   red: '#FF4757',
   amber: '#FFB800',
   cyan: '#00D4FF',
-  purple: '#9C6FFF',
   white: '#FFFFFF',
   textSecondary: '#8888A8',
   textMuted: '#555577',
 };
 
-function LimitProgressBar({ pct, limitPct, label }: { pct: number; limitPct: number; label: string }) {
-  const safeLimit = limitPct > 0 ? limitPct : 1;
-  const ratio = Math.min(Math.max(pct, 0) / safeLimit, 1);
-  const color = ratio >= 1 ? C.red : ratio >= 0.75 ? C.amber : C.green;
-
-  return (
-    <View style={styles.limitBarItem}>
-      <View style={styles.limitBarHeader}>
-        <Text style={styles.limitBarLabel}>{label}</Text>
-        <Text style={styles.limitBarVal}>
-          <Text style={{ color, fontWeight: '700' }}>{pct.toFixed(1)}%</Text>
-          <Text style={{ color: C.textSecondary }}> / {limitPct.toFixed(1)}%</Text>
-        </Text>
-      </View>
-      <View style={styles.limitBarTrack}>
-        <View style={[styles.limitBarFill, { width: `${ratio * 100}%`, backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
-
 export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'trades' | 'calendar'>('trades');
 
   const { data: accounts, refetch: refetchAccounts, isFetching: isFetchingAccounts } = useAccounts();
   const { data: poisData, refetch: refetchPOIs, isFetching: isFetchingPOIs } = usePOIs();
   const { data: tradesData, refetch: refetchTrades, isFetching: isFetchingTrades } = useTrades();
-  const { data: riskData, refetch: refetchRisk, isFetching: isFetchingRisk } = useRiskDashboard();
 
   const { data: eas, refetch: refetchEAs, isFetching: isFetchingEAs } = useQuery({
     queryKey: ['eaMonitor'],
@@ -81,12 +51,11 @@ export default function DashboardScreen() {
     refetchInterval: 10000,
   });
 
-  const isFetching = isFetchingAccounts || isFetchingPOIs || isFetchingTrades || isFetchingRisk || isFetchingEAs;
+  const isFetching = isFetchingAccounts || isFetchingPOIs || isFetchingTrades || isFetchingEAs;
   const refetchAll = () => {
     refetchAccounts();
     refetchPOIs();
     refetchTrades();
-    refetchRisk();
     refetchEAs();
   };
 
@@ -98,18 +67,7 @@ export default function DashboardScreen() {
   const trades = tradesData?.items || [];
 
   const activeTrades = trades.filter((t) => t.status === 'OPEN');
-  const pendingPOIs = pois.filter((p) => p.status === 'PENDING');
-  const activePOIs = pois.filter((p) => p.status === 'ACTIVE');
-  const tpHits = pois.filter((p) => p.status === 'TP_HIT').length;
-  const slHits = pois.filter((p) => p.status === 'SL_HIT').length;
-
-  // Active risk limits
-  const dailyRiskPct = riskData?.daily_risk_pct ?? 0;
-  const dailyRiskLimit = riskData?.limits?.daily_risk_limit_pct ?? 5.0;
-  const drawdownPct = riskData?.daily_drawdown_pct ?? 0;
-  const maxDrawdownLimit = riskData?.limits?.max_drawdown_pct ?? 10.0;
-  const riskPerTrade = riskData?.risk_per_trade_pct ?? 0;
-  const riskPerTradeTarget = riskData?.limits?.risk_per_trade_pct ?? 2.0;
+  const pendingOrders = pois.filter((p) => p.status === 'PENDING' || p.status === 'ACTIVE');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -141,7 +99,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ── Account Card ── */}
+        {/* ── Account Balance Card ── */}
         {account ? (
           <View style={styles.card}>
             <Text style={styles.accountBrokerLabel}>
@@ -189,156 +147,63 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* ── Account Limits & Live Risk Section ── */}
-        <View style={styles.riskCard}>
-          <View style={styles.riskHeaderRow}>
-            <View style={styles.riskTitleLeft}>
-              <ShieldAlert size={16} color={C.green} />
-              <Text style={styles.riskTitleText}>Account Limits & Risk</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.riskDetailLink}
-              onPress={() => router.push('/(tabs)/more/risk' as any)}
-            >
-              <Text style={styles.riskDetailText}>Details</Text>
-              <ChevronRight size={14} color={C.green} />
-            </TouchableOpacity>
-          </View>
-
-          <LimitProgressBar pct={dailyRiskPct} limitPct={dailyRiskLimit} label="Daily Risk Limit" />
-          <LimitProgressBar pct={drawdownPct} limitPct={maxDrawdownLimit} label="Max Drawdown" />
-          <LimitProgressBar pct={riskPerTrade} limitPct={riskPerTradeTarget} label="Risk Per Trade" />
-
-          {riskData?.warnings && riskData.warnings.length > 0 && (
-            <View style={styles.riskWarningBadge}>
-              <AlertTriangle size={14} color={C.amber} />
-              <Text style={styles.riskWarningText} numberOfLines={1}>
-                {riskData.warnings[0].message}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* ── POI Counter Row ── */}
-        <View style={styles.poiCounterRow}>
-          <View style={[styles.poiCounterBox, { borderColor: C.amber }]}>
-            <Text style={[styles.poiCounterValue, { color: C.amber }]}>{pendingPOIs.length}</Text>
-            <Text style={styles.poiCounterLabel}>Pending</Text>
-          </View>
-          <View style={[styles.poiCounterBox, { borderColor: C.cyan }]}>
-            <Text style={[styles.poiCounterValue, { color: C.cyan }]}>{activePOIs.length}</Text>
-            <Text style={styles.poiCounterLabel}>Active</Text>
-          </View>
-          <View style={[styles.poiCounterBox, { borderColor: C.green }]}>
-            <Text style={[styles.poiCounterValue, { color: C.green }]}>{tpHits}</Text>
-            <Text style={styles.poiCounterLabel}>TP Hit</Text>
-          </View>
-          <View style={[styles.poiCounterBox, { borderColor: C.red }]}>
-            <Text style={[styles.poiCounterValue, { color: C.red }]}>{slHits}</Text>
-            <Text style={styles.poiCounterLabel}>SL Hit</Text>
-          </View>
-        </View>
-
-        {/* ── Segment Switcher: Active Trades vs Trade Calendar History ── */}
-        <View style={styles.segmentContainer}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'trades' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('trades')}
-            activeOpacity={0.7}
-          >
-            <TrendingUp size={15} color={activeTab === 'trades' ? C.green : C.textSecondary} />
-            <Text style={[styles.segmentBtnText, activeTab === 'trades' && styles.segmentBtnTextActive]}>
-              Active Trades ({activeTrades.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'calendar' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('calendar')}
-            activeOpacity={0.7}
-          >
-            <CalendarIcon size={15} color={activeTab === 'calendar' ? C.green : C.textSecondary} />
-            <Text style={[styles.segmentBtnText, activeTab === 'calendar' && styles.segmentBtnTextActive]}>
-              History Calendar
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Tab Content: Active Trades or Calendar History ── */}
-        {activeTab === 'trades' ? (
-          <View>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <TrendingUp size={18} color={C.green} />
-                <Text style={styles.sectionTitle}>Active Positions</Text>
-                <View style={styles.sectionBadge}>
-                  <Text style={styles.sectionBadgeText}>{activeTrades.length}</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.sectionAction}
-                onPress={() => router.push('/(tabs)/trades')}
-              >
-                <Text style={styles.sectionActionText}>View All</Text>
-                <ArrowRight size={14} color={C.green} />
-              </TouchableOpacity>
-            </View>
-
-            {activeTrades.length > 0 ? (
-              activeTrades.map((trade) => (
-                <View key={trade.id} style={styles.cardItem}>
-                  <TradeCard
-                    trade={trade}
-                    onPress={() => router.push(`/(tabs)/trades/${trade.id}` as any)}
-                  />
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <TrendingUp size={32} color={C.textMuted} />
-                <Text style={styles.emptyStateTitle}>No Active Trades</Text>
-                <Text style={styles.emptyStateSubtitle}>Live positions reported by MT5 will appear here</Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.calendarSection}>
-            <TradeCalendar
-              trades={trades}
-              onSelectTrade={(trade) => router.push(`/(tabs)/trades/${trade.id}` as any)}
-            />
-          </View>
-        )}
-
-        {/* ── Pending POIs Section ── */}
-        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+        {/* ── Active Positions Section ── */}
+        <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
-            <Target size={18} color={C.amber} />
-            <Text style={styles.sectionTitle}>Pending POIs</Text>
-            <View style={[styles.sectionBadge, { backgroundColor: '#FFB80022' }]}>
-              <Text style={[styles.sectionBadgeText, { color: C.amber }]}>{pendingPOIs.length}</Text>
+            <TrendingUp size={18} color={C.green} />
+            <Text style={styles.sectionTitle}>Active Positions</Text>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>{activeTrades.length}</Text>
             </View>
           </View>
           <TouchableOpacity
             style={styles.sectionAction}
-            onPress={() => router.push('/(tabs)/pois')}
+            onPress={() => router.push('/(tabs)/trades')}
           >
-            <Text style={styles.sectionActionText}>View All</Text>
+            <Text style={styles.sectionActionText}>History</Text>
             <ArrowRight size={14} color={C.green} />
           </TouchableOpacity>
         </View>
 
-        {pendingPOIs.length > 0 ? (
-          pendingPOIs.slice(0, 5).map((poi) => (
+        {activeTrades.length > 0 ? (
+          activeTrades.map((trade) => (
+            <View key={trade.id} style={styles.cardItem}>
+              <TradeCard
+                trade={trade}
+                onPress={() => router.push(`/(tabs)/trades/${trade.id}` as any)}
+              />
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <TrendingUp size={28} color={C.textMuted} />
+            <Text style={styles.emptyStateTitle}>No Active Trades</Text>
+            <Text style={styles.emptyStateSubtitle}>Live positions reported by MT5 will appear here</Text>
+          </View>
+        )}
+
+        {/* ── EA Pending Orders & Limits Section ── */}
+        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+          <View style={styles.sectionHeaderLeft}>
+            <Target size={18} color={C.amber} />
+            <Text style={styles.sectionTitle}>EA Pending Orders & Limits</Text>
+            <View style={[styles.sectionBadge, { backgroundColor: '#FFB80022' }]}>
+              <Text style={[styles.sectionBadgeText, { color: C.amber }]}>{pendingOrders.length}</Text>
+            </View>
+          </View>
+        </View>
+
+        {pendingOrders.length > 0 ? (
+          pendingOrders.map((poi) => (
             <View key={poi.id} style={styles.cardItem}>
               <POICard poi={poi} />
             </View>
           ))
         ) : (
           <View style={styles.emptyState}>
-            <Target size={32} color={C.textMuted} />
-            <Text style={styles.emptyStateTitle}>No Pending POIs</Text>
-            <Text style={styles.emptyStateSubtitle}>Pending zones will appear here</Text>
+            <Target size={28} color={C.textMuted} />
+            <Text style={styles.emptyStateTitle}>No Pending Orders</Text>
+            <Text style={styles.emptyStateSubtitle}>Limit orders and pending zones set by EA will appear here</Text>
           </View>
         )}
 
@@ -398,7 +263,7 @@ const styles = StyleSheet.create({
   eaDot: {
     width: 7,
     height: 7,
-    borderRadius: 999,
+    borderRadius: 4,
     marginRight: 6,
   },
   eaPillText: {
@@ -413,34 +278,34 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.border,
-    padding: 18,
-    marginBottom: 14,
+    padding: 20,
+    marginBottom: 20,
   },
   accountBrokerLabel: {
     fontSize: 12,
     color: C.textSecondary,
     marginBottom: 6,
-    fontWeight: '500',
   },
   accountBalance: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '800',
     color: C.white,
     letterSpacing: -0.5,
   },
   accountBalanceLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: C.textSecondary,
     marginTop: 2,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   accountMetricsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
+    backgroundColor: C.surface2,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   accountMetric: {
     flex: 1,
@@ -452,176 +317,40 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   accountMetricValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: C.white,
   },
   metricDivider: {
     width: 1,
-    height: 28,
+    height: 24,
     backgroundColor: C.border,
   },
 
-  // ── Risk & Limits Card ──
-  riskCard: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: 16,
-    marginBottom: 14,
-  },
-  riskHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  riskTitleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  riskTitleText: {
-    color: C.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  riskDetailLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  riskDetailText: {
-    color: C.green,
-    fontSize: 12,
-    fontWeight: '600',
-    marginRight: 2,
-  },
-  limitBarItem: {
-    marginBottom: 10,
-  },
-  limitBarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  limitBarLabel: {
-    color: C.textSecondary,
-    fontSize: 12,
-  },
-  limitBarVal: {
-    fontSize: 12,
-  },
-  limitBarTrack: {
-    height: 6,
-    backgroundColor: C.surface2,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  limitBarFill: {
-    height: '100%',
-    borderRadius: 999,
-  },
-  riskWarningBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 184, 0, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginTop: 4,
-    gap: 6,
-  },
-  riskWarningText: {
-    color: C.amber,
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-  },
-
-  // ── POI Counter Row ──
-  poiCounterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  poiCounterBox: {
-    flex: 1,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  poiCounterValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  poiCounterLabel: {
-    fontSize: 10,
-    color: C.textSecondary,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-
-  // ── Segment Switcher ──
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: 4,
-    marginBottom: 16,
-  },
-  segmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  segmentBtnActive: {
-    backgroundColor: C.surface2,
-    borderWidth: 1,
-    borderColor: '#3A3A50',
-  },
-  segmentBtnText: {
-    color: C.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  segmentBtnTextActive: {
-    color: C.white,
-    fontWeight: '700',
-  },
-
-  // ── Sections ──
+  // ── Section Headers ──
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    marginTop: 4,
   },
   sectionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: C.white,
+    marginLeft: 8,
   },
   sectionBadge: {
     backgroundColor: '#00C89622',
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 999,
+    borderRadius: 10,
+    marginLeft: 8,
   },
   sectionBadgeText: {
     fontSize: 11,
@@ -638,38 +367,42 @@ const styles = StyleSheet.create({
     color: C.green,
     fontWeight: '600',
   },
+
   cardItem: {
     marginBottom: 10,
   },
-  calendarSection: {
-    marginTop: 4,
-  },
+
+  // ── Empty State ──
   emptyState: {
     backgroundColor: C.surface,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: C.border,
-    padding: 32,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   emptyStateTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: C.white,
     marginTop: 10,
   },
   emptyStateSubtitle: {
     fontSize: 12,
-    color: C.textSecondary,
+    color: C.textMuted,
     marginTop: 4,
+    textAlign: 'center',
   },
   emptyText: {
+    fontSize: 14,
     color: C.textSecondary,
     textAlign: 'center',
   },
+
   bottomSpacer: {
-    height: 24,
+    height: 20,
   },
 });
