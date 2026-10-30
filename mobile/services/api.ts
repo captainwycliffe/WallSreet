@@ -7,7 +7,7 @@ import { Trade, TradeJournal } from '../types/trade';
 import { AnalyticsMetrics, EquityPoint, DailyPLPoint, AnalyticsFilter } from '../types/analytics';
 import { RiskDashboard, RiskLimits } from '../types/risk';
 import { PaginatedResponse, ApiResponse } from '../types/api';
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.102:8080';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://mt5-monitor-i6si.onrender.com';
 // Backend mounts every route under /api (see backend/app/main.py) except
 // /health and /ws — the base URL was missing this prefix entirely, so
 // every single request below was 404ing before this fix.

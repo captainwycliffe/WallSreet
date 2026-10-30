@@ -9,7 +9,7 @@ class WebSocketService {
   private pingInterval: any = null;
 
   connect(userId: string, token: string): void {
-    const wsUrl = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.0.102:8080/ws';
+    const wsUrl = process.env.EXPO_PUBLIC_WS_URL || 'wss://mt5-monitor-i6si.onrender.com/ws';
     this.isIntentionalDisconnect = false;
     
     if (this.ws) {

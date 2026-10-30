@@ -13,7 +13,7 @@
 // ─── Input Parameters ──────────────────────────────────────────────────────────
 input group "=== Backend Connection Settings ==="
 input string   EA_API_KEY        = "mt5ea_demo_key_12345";       // Backend EA API Key
-input string   BACKEND_URL       = "http://127.0.0.1:8080";       // Backend Server URL (127.0.0.1 for local PC)
+input string   BACKEND_URL       = "https://mt5-monitor-i6si.onrender.com"; // Backend Server URL (Render cloud)
 input int      HEARTBEAT_SECONDS = 15;                           // Heartbeat Interval (secs)
 input bool     ENABLE_REPORTING  = true;                         // Enable Event Reporting
 input bool     DEBUG_MODE        = true;                         // Show Debug Logs in Experts Tab
