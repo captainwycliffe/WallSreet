@@ -36,6 +36,7 @@ class TradeService:
         else:
             return (entry - exit) * multiplier
 
+    async def open_position(self, account_id: str, req: TradeCreate) -> Trade:
         ticket_val = req.mt5_ticket or req.ticket or 0
         volume_val = req.volume if req.volume is not None else (req.lot_size if req.lot_size is not None else 0.01)
         idem_key = req.idempotency_key or f"pos_open_{ticket_val}"
