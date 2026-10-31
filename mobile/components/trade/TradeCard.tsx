@@ -13,6 +13,7 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
   const isBuy = trade.direction === "BUY";
   const profit = trade.profit || 0;
   const prefix = profit >= 0 ? "+" : "";
+  const exactLots = trade.volume != null ? String(Number(parseFloat(String(trade.volume)).toFixed(4))) : "0";
   let progress = 0;
   if (trade.current_price && trade.take_profit && trade.entry_price && trade.take_profit > 0) {
     const totalDist = Math.abs(trade.take_profit - trade.entry_price);
@@ -48,7 +49,9 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
       <View style={styles.row}>
         <View style={styles.row}>
           <Text style={styles.symbol}>{trade.symbol}</Text>
-          <Text style={[styles.dir, { color: isBuy ? C.green : C.red }]}>{trade.direction}</Text>
+          <Text style={[styles.dir, { color: isBuy ? C.green : C.red }]}>
+            {trade.direction} · {exactLots} lots
+          </Text>
         </View>
         <StatusBadge status={trade.status} />
       </View>

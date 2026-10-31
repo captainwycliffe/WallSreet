@@ -34,7 +34,9 @@ class TradeCreate(BaseModel):
             if not data.get("mt5_ticket") and data.get("ticket"):
                 data["mt5_ticket"] = int(data["ticket"])
             if data.get("volume") is None and data.get("lot_size") is not None:
-                data["volume"] = float(data["lot_size"])
+                data["volume"] = round(float(data["lot_size"]), 4)
+            elif data.get("volume") is not None:
+                data["volume"] = round(float(data["volume"]), 4)
             if not data.get("idempotency_key"):
                 t = data.get("mt5_ticket") or data.get("ticket") or "0"
                 data["idempotency_key"] = f"pos_open_{t}"
@@ -100,6 +102,13 @@ class TradeResponse(BaseModel):
     opened_at: datetime
     closed_at: Optional[datetime] = None
     created_at: datetime
+
+    @field_validator("volume", mode="before")
+    @classmethod
+    def normalize_volume(cls, v: Any) -> float:
+        if v is None:
+            return 0.0
+        return round(float(v), 4)
     
     model_config = ConfigDict(from_attributes=True)
 

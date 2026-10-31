@@ -12,13 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.notification import NotificationLog
 from app.repositories.notification_repo import NotificationRepository
-from app.websocket.events import publish_poi_event
 from app.websocket.manager import ws_manager
 from app.schemas.websocket import WSMessage
 
 logger = logging.getLogger(__name__)
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+
+NORMAL_CHANNEL_ID = "mt5_normal_v2"
+NEAR_ENTRY_CHANNEL_ID = "mt5_near_entry_v2"
+
+NORMAL_SOUND_NAME = "normal_notification.wav"
+NEAR_ENTRY_SOUND_NAME = "near_entry_alert.wav"
 
 
 class NotificationService:
@@ -41,6 +46,12 @@ class NotificationService:
         tokens = await self.repo.get_active_tokens_for_user(user_id)
         success = False
 
+        is_near_entry = notif_type == "PRICE_NEAR_ENTRY"
+        channel_id = NEAR_ENTRY_CHANNEL_ID if is_near_entry else NORMAL_CHANNEL_ID
+        sound_name = NEAR_ENTRY_SOUND_NAME if is_near_entry else NORMAL_SOUND_NAME
+
+        payload_data = {**(data or {}), "type": notif_type}
+
         if tokens:
             headers = {
                 "Content-Type": "application/json",
@@ -54,9 +65,10 @@ class NotificationService:
                     "to": t.token,
                     "title": title,
                     "body": body,
-                    "data": data or {},
-                    "sound": "default",
-                    "channelId": "default",
+                    "data": payload_data,
+                    "sound": sound_name,
+                    "channelId": channel_id,
+                    "priority": "high",
                 }
                 for t in tokens
             ]
@@ -81,18 +93,19 @@ class NotificationService:
             logger.debug("No active push tokens for user %s — logging & WS only", user_id)
 
         # Log notification in database
+        log_id: Optional[str] = None
         try:
-            await self.repo.log_notification(
-                NotificationLog(
-                    user_id=user_id,
-                    type=notif_type,
-                    title=title,
-                    body=body,
-                    data=data,
-                    sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                    success=success or (len(tokens) == 0),
-                )
+            log_entry = NotificationLog(
+                user_id=user_id,
+                type=notif_type,
+                title=title,
+                body=body,
+                data=payload_data,
+                sent_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                success=success or (len(tokens) == 0),
             )
+            saved_log = await self.repo.log_notification(log_entry)
+            log_id = getattr(saved_log, "id", None) or getattr(log_entry, "id", None)
         except Exception as e:
             logger.warning("Failed to save notification log: %s", e)
 
@@ -101,10 +114,13 @@ class NotificationService:
             ws_msg = WSMessage(
                 type="NOTIFICATION",
                 data={
+                    "id": log_id,
                     "type": notif_type,
                     "title": title,
                     "body": body,
-                    "data": data or {},
+                    "sound": sound_name,
+                    "channelId": channel_id,
+                    "data": payload_data,
                 },
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )

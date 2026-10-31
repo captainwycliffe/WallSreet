@@ -56,7 +56,7 @@ export default function TradeDetailScreen() {
               </View>
               <Text style={[styles.rMultiple, { color: profitColor }]}>{trade.r_multiple?.toFixed(2) ?? '0.00'}R</Text>
 
-              <Row label="Volume" value={trade.volume.toFixed(2)} />
+              <Row label="Volume" value={`${Number(parseFloat(String(trade.volume)).toFixed(4))}`} />
               <Row label="Entry price" value={trade.entry_price.toFixed(5)} />
               {trade.exit_price != null && <Row label="Exit price" value={trade.exit_price.toFixed(5)} />}
               <Row label="Stop loss" value={trade.stop_loss.toFixed(5)} color={C.red} />

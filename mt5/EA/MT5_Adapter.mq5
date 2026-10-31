@@ -18,6 +18,12 @@ input int      HEARTBEAT_SECONDS = 15;                           // Heartbeat In
 input bool     ENABLE_REPORTING  = true;                         // Enable Event Reporting
 input bool     DEBUG_MODE        = true;                         // Show Debug Logs in Experts Tab
 
+input group "=== Near-Entry Alert Distances ==="
+input double   GOLD_ALERT_USD    = 2.00;                         // Gold (XAUUSD) Alert Distance ($2.00 = 20 pips)
+input double   FX_ALERT_PIPS     = 7.0;                          // Forex Alert Distance (7 pips)
+input double   BTC_ALERT_USD     = 150.0;                        // Bitcoin (BTCUSD) Alert Distance ($150)
+input double   INDEX_ALERT_PTS   = 25.0;                         // Indices (NAS100/US30) Alert Distance (25 pts)
+
 //+------------------------------------------------------------------+
 //| Core Adapter Implementation                                       |
 //+------------------------------------------------------------------+

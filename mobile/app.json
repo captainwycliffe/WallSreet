@@ -29,7 +29,17 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#00C896",
+          "sounds": [
+            "./assets/sounds/normal_notification.wav",
+            "./assets/sounds/near_entry_alert.wav"
+          ]
+        }
+      ],
       [
         "expo-splash-screen",
         {

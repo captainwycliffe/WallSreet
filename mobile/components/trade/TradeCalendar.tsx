@@ -342,7 +342,7 @@ export function TradeCalendar({
                   </View>
                   <View style={{ marginLeft: 8 }}>
                     <Text style={styles.tradeSymbol}>{t.symbol}</Text>
-                    <Text style={styles.tradeMeta}>Vol: {t.volume} · #{t.mt5_ticket}</Text>
+                    <Text style={styles.tradeMeta}>Vol: {Number(parseFloat(String(t.volume)).toFixed(4))} · #{t.mt5_ticket}</Text>
                   </View>
                 </View>
 

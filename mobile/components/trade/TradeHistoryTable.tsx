@@ -57,12 +57,18 @@ export function TradeHistoryTable({ trades, onSelectTrade, title }: TradeHistory
     return `-$${Math.abs(comm).toFixed(2)}`;
   };
 
+  const formatLots = (vol?: number | string | null): string => {
+    if (vol == null) return '-';
+    const num = Number(parseFloat(String(vol)).toFixed(4));
+    return isNaN(num) ? '-' : String(num);
+  };
+
   const handleShare = async (trade: Trade) => {
     const isProfit = (trade.profit ?? 0) >= 0;
     const pnlFormatted = `${isProfit ? '+' : '-'}$${Math.abs(trade.profit ?? 0).toFixed(2)}`;
     try {
       await Share.share({
-        message: `MT5 Monitor Trade: ${trade.symbol} ${trade.direction} ${trade.volume} lots | Profit: ${pnlFormatted} | Open: ${trade.entry_price} | Closed: ${trade.exit_price ?? trade.current_price ?? '-'}`,
+        message: `MT5 Monitor Trade: ${trade.symbol} ${trade.direction} ${formatLots(trade.volume)} lots | Profit: ${pnlFormatted} | Open: ${trade.entry_price} | Closed: ${trade.exit_price ?? trade.current_price ?? '-'}`,
       });
     } catch {
       // User cancelled or error
@@ -175,7 +181,7 @@ export function TradeHistoryTable({ trades, onSelectTrade, title }: TradeHistory
                   {/* Lots */}
                   <View style={[styles.cell, styles.colLots]}>
                     <Text style={styles.lotsText}>
-                      {trade.volume != null ? trade.volume.toFixed(trade.volume >= 1 ? 1 : 2) : '-'}
+                      {formatLots(trade.volume)}
                     </Text>
                   </View>
 

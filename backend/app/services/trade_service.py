@@ -106,6 +106,7 @@ class TradeService:
 
                 entry_val = float(trade.entry_price)
                 price_str = f"{entry_val:.2f}" if entry_val > 100 else f"{entry_val:.5f}"
+                lots_str = f"{round(float(trade.volume), 4):g}"
 
                 if activated_poi:
                     # Send limit activated notification
@@ -113,7 +114,7 @@ class TradeService:
                         user_id=acc.user_id,
                         notif_type="LIMIT_ACTIVATED",
                         title="⚡ Limit Order Activated",
-                        body=f"{trade.symbol} limit filled at {price_str} ({trade.volume} lots)",
+                        body=f"{trade.symbol} limit filled at {price_str} ({lots_str} lots)",
                         data={"trade_id": trade.id, "ticket": trade.mt5_ticket, "symbol": trade.symbol}
                     )
                 else:
@@ -122,7 +123,7 @@ class TradeService:
                         user_id=acc.user_id,
                         notif_type="TRADE_OPENED",
                         title="📈 Trade Activated",
-                        body=f"{trade.symbol} {trade.direction.value} {trade.volume} lots opened @ {price_str}",
+                        body=f"{trade.symbol} {trade.direction.value} {lots_str} lots opened @ {price_str}",
                         data={"trade_id": trade.id, "ticket": trade.mt5_ticket, "symbol": trade.symbol}
                     )
         except Exception as e:
