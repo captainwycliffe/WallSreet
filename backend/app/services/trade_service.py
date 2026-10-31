@@ -41,8 +41,18 @@ class TradeService:
         volume_val = req.volume if req.volume is not None else (req.lot_size if req.lot_size is not None else 0.01)
         idem_key = req.idempotency_key or f"pos_open_{ticket_val}"
 
-        existing = await self.repo.get_by_idempotency_key(idem_key)
+        existing = await self.repo.get_by_ticket(ticket_val) or await self.repo.get_by_idempotency_key(idem_key)
         if existing:
+            if existing.symbol == "MT5_TRADE" and req.symbol and req.symbol != "MT5_TRADE":
+                existing.symbol = req.symbol
+                existing.direction = req.direction
+                existing.volume = volume_val
+                existing.entry_price = req.entry_price
+                if req.stop_loss is not None:
+                    existing.stop_loss = req.stop_loss
+                if req.take_profit is not None:
+                    existing.take_profit = req.take_profit
+                existing = await self.repo.update(existing)
             return existing
             
         trade = Trade(
@@ -53,10 +63,10 @@ class TradeService:
             direction=req.direction,
             volume=volume_val,
             entry_price=req.entry_price,
-            stop_loss=req.stop_loss,
-            take_profit=req.take_profit,
-            current_price=req.current_price,
-            opened_at=req.opened_at,
+            stop_loss=req.stop_loss if req.stop_loss is not None else 0.0,
+            take_profit=req.take_profit if req.take_profit is not None else 0.0,
+            current_price=req.current_price if req.current_price is not None else req.entry_price,
+            opened_at=req.opened_at or datetime.utcnow(),
             status=TradeStatus.OPEN,
             idempotency_key=idem_key
         )

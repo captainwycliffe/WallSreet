@@ -66,6 +66,10 @@ class TradeClose(BaseModel):
     idempotency_key: str = ""
     close_reason: Optional[str] = None
     ticket: Optional[int] = None
+    symbol: Optional[str] = None
+    direction: Optional[TradeDirection] = None
+    volume: Optional[float] = None
+    entry_price: Optional[float] = None
 
     @field_validator("closed_at", mode="before")
     def validate_closed_at(cls, v):

@@ -5,7 +5,7 @@ from app.db.session import get_session
 from app.core.dependencies import get_ea_from_api_key, RateLimiter, get_db
 from app.models.account import EARegistration, MT5Account, EARegistrationStatus
 from app.models.poi import POI, POIStatus
-from app.models.trade import Trade, TradeStatus
+from app.models.trade import Trade, TradeStatus, TradeDirection
 from app.schemas.poi import POICreate, POIResponse, POIUpdate
 from app.schemas.trade import TradeCreate, TradeResponse, TradeUpdate, TradeClose
 from app.schemas.event import HeartbeatPayload
@@ -224,27 +224,34 @@ async def close_position(
 ):
     from app.repositories.trade_repo import TradeRepository
     repo = TradeRepository(db)
+    trade = await repo.get_by_ticket(ticket)
     if not trade:
+        closed_time = req.closed_at or datetime.utcnow()
         trade = Trade(
             account_id=ea.account_id,
             mt5_ticket=ticket,
-            symbol="MT5_TRADE",
-            direction=TradeDirection.BUY,
-            volume=0.01,
-            entry_price=req.exit_price,
+            symbol=req.symbol or "MT5_TRADE",
+            direction=req.direction or TradeDirection.BUY,
+            volume=req.volume or 0.01,
+            entry_price=req.entry_price if req.entry_price is not None else req.exit_price,
+            stop_loss=0.0,
+            take_profit=0.0,
+            current_price=req.exit_price,
             exit_price=req.exit_price,
             profit=req.profit,
             commission=req.commission,
             swap=req.swap,
             net_profit=req.profit + req.commission + req.swap,
             status=TradeStatus.CLOSED,
-            closed_at=req.closed_at or datetime.utcnow(),
-            idempotency_key=f"pos_close_{ticket}"
+            opened_at=closed_time,
+            closed_at=closed_time,
+            idempotency_key=req.idempotency_key or f"pos_close_{ticket}"
         )
         trade = await repo.create(trade)
     else:
         if trade.status == TradeStatus.CLOSED:
             return trade
+        trade.current_price = req.exit_price
         trade.exit_price = req.exit_price
         trade.profit = req.profit
         trade.commission = req.commission
