@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, field_validator
-from typing import Optional, Union
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from typing import Optional, Union, Any
 from datetime import datetime
 from app.models.trade import TradeStatus, TradeDirection
 
@@ -13,17 +13,32 @@ def parse_mql_datetime(v: Union[datetime, str, None]) -> Optional[datetime]:
         return datetime.utcnow()
 
 class TradeCreate(BaseModel):
-    mt5_ticket: int
+    mt5_ticket: Optional[int] = None
+    ticket: Optional[int] = None
     symbol: str
     direction: TradeDirection
-    volume: float
+    volume: Optional[float] = None
+    lot_size: Optional[float] = None
     entry_price: float
     stop_loss: float
     take_profit: float
     current_price: Optional[float] = None
     opened_at: Optional[Union[datetime, str]] = None
     poi_id: Optional[str] = None
-    idempotency_key: str
+    idempotency_key: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("mt5_ticket") and data.get("ticket"):
+                data["mt5_ticket"] = int(data["ticket"])
+            if data.get("volume") is None and data.get("lot_size") is not None:
+                data["volume"] = float(data["lot_size"])
+            if not data.get("idempotency_key"):
+                t = data.get("mt5_ticket") or data.get("ticket") or "0"
+                data["idempotency_key"] = f"pos_open_{t}"
+        return data
 
     @field_validator("opened_at", mode="before")
     def validate_opened_at(cls, v):
@@ -49,6 +64,8 @@ class TradeClose(BaseModel):
     swap: float = 0.0
     closed_at: Optional[Union[datetime, str]] = None
     idempotency_key: str = ""
+    close_reason: Optional[str] = None
+    ticket: Optional[int] = None
 
     @field_validator("closed_at", mode="before")
     def validate_closed_at(cls, v):

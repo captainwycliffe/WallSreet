@@ -188,17 +188,30 @@ async def update_position(
     repo = TradeRepository(db)
     trade = await repo.get_by_ticket(ticket)
     if not trade:
-        await db.commit()
-        return {"status": "not_registered_yet"}
-
-    trade.status = TradeStatus.OPEN
-    if req.current_price is not None: trade.current_price = req.current_price
-    if req.stop_loss is not None: trade.stop_loss = req.stop_loss
-    if req.take_profit is not None: trade.take_profit = req.take_profit
-    if req.profit is not None: trade.profit = req.profit
-    profit_val = req.profit if req.profit is not None else req.unrealized_profit
-    if profit_val is not None: trade.profit = profit_val
-    await repo.update(trade)
+        trade = Trade(
+            account_id=ea.account_id,
+            mt5_ticket=ticket,
+            symbol="MT5_TRADE",
+            direction=TradeDirection.BUY,
+            volume=0.01,
+            entry_price=req.current_price or 0.0,
+            current_price=req.current_price or 0.0,
+            stop_loss=req.stop_loss or 0.0,
+            take_profit=req.take_profit or 0.0,
+            profit=req.profit or req.unrealized_profit or 0.0,
+            status=TradeStatus.OPEN,
+            opened_at=datetime.utcnow(),
+            idempotency_key=f"pos_open_{ticket}"
+        )
+        trade = await repo.create(trade)
+    else:
+        trade.status = TradeStatus.OPEN
+        if req.current_price is not None: trade.current_price = req.current_price
+        if req.stop_loss is not None: trade.stop_loss = req.stop_loss
+        if req.take_profit is not None: trade.take_profit = req.take_profit
+        profit_val = req.profit if req.profit is not None else req.unrealized_profit
+        if profit_val is not None: trade.profit = profit_val
+        await repo.update(trade)
     await db.commit()
     return {"status": "updated"}
 
@@ -211,20 +224,66 @@ async def close_position(
 ):
     from app.repositories.trade_repo import TradeRepository
     repo = TradeRepository(db)
-    trade = await repo.get_by_ticket(ticket)
     if not trade:
-        return {"status": "not_found"}
-    if trade.status == TradeStatus.CLOSED:
-        return trade
-    
-    trade.exit_price = req.exit_price
-    trade.profit = req.profit
-    trade.commission = req.commission
-    trade.swap = req.swap
-    trade.net_profit = req.profit + req.commission + req.swap
-    trade.closed_at = req.closed_at
-    trade.status = TradeStatus.CLOSED
-    await repo.update(trade)
+        trade = Trade(
+            account_id=ea.account_id,
+            mt5_ticket=ticket,
+            symbol="MT5_TRADE",
+            direction=TradeDirection.BUY,
+            volume=0.01,
+            entry_price=req.exit_price,
+            exit_price=req.exit_price,
+            profit=req.profit,
+            commission=req.commission,
+            swap=req.swap,
+            net_profit=req.profit + req.commission + req.swap,
+            status=TradeStatus.CLOSED,
+            closed_at=req.closed_at or datetime.utcnow(),
+            idempotency_key=f"pos_close_{ticket}"
+        )
+        trade = await repo.create(trade)
+    else:
+        if trade.status == TradeStatus.CLOSED:
+            return trade
+        trade.exit_price = req.exit_price
+        trade.profit = req.profit
+        trade.commission = req.commission
+        trade.swap = req.swap
+        trade.net_profit = req.profit + req.commission + req.swap
+        trade.closed_at = req.closed_at or datetime.utcnow()
+        trade.status = TradeStatus.CLOSED
+        await repo.update(trade)
+
+    await db.commit()
+
+    # Emit event bus & WS notification
+    from app.events.bus import event_bus
+    await event_bus.emit("POSITION_CLOSED", {
+        "account_id": ea.account_id,
+        "trade_id": trade.id,
+        "ticket": ticket,
+        "net_profit": trade.net_profit,
+    })
+
+    try:
+        from app.services.notification_service import NotificationService
+        notif_service = NotificationService(db)
+        acc_res = await db.execute(select(MT5Account).where(MT5Account.id == ea.account_id))
+        acc = acc_res.scalar_one_or_none()
+        if acc:
+            p_sign = "+" if (trade.net_profit or 0) >= 0 else ""
+            title = f"💰 Trade Closed ({p_sign}${trade.net_profit:.2f})"
+            body = f"{trade.symbol} #{ticket} closed at {trade.exit_price:.5f} (P/L: {p_sign}${trade.net_profit:.2f})"
+            await notif_service.send_to_user(
+                user_id=acc.user_id,
+                notif_type="TRADE_CLOSED",
+                title=title,
+                body=body,
+                data={"ticket": ticket, "net_profit": trade.net_profit}
+            )
+    except Exception as e:
+        logger.warning("Failed to send trade closed notification: %s", e)
+
     return trade
 
 @router.get("/config")

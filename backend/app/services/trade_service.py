@@ -36,25 +36,28 @@ class TradeService:
         else:
             return (entry - exit) * multiplier
 
-    async def open_position(self, account_id: str, req: TradeCreate) -> Trade:
-        existing = await self.repo.get_by_idempotency_key(req.idempotency_key)
+        ticket_val = req.mt5_ticket or req.ticket or 0
+        volume_val = req.volume if req.volume is not None else (req.lot_size if req.lot_size is not None else 0.01)
+        idem_key = req.idempotency_key or f"pos_open_{ticket_val}"
+
+        existing = await self.repo.get_by_idempotency_key(idem_key)
         if existing:
             return existing
             
         trade = Trade(
             account_id=account_id,
             poi_id=req.poi_id if req.poi_id and len(req.poi_id) > 5 else None,
-            mt5_ticket=req.mt5_ticket,
+            mt5_ticket=ticket_val,
             symbol=req.symbol,
             direction=req.direction,
-            volume=req.volume,
+            volume=volume_val,
             entry_price=req.entry_price,
             stop_loss=req.stop_loss,
             take_profit=req.take_profit,
             current_price=req.current_price,
             opened_at=req.opened_at,
             status=TradeStatus.OPEN,
-            idempotency_key=req.idempotency_key
+            idempotency_key=idem_key
         )
         trade = await self.repo.create(trade)
         

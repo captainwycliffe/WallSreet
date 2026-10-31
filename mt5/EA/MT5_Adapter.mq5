@@ -147,10 +147,17 @@ private:
          ulong ticket = PositionGetTicket(i);
          if(ticket == 0 || !PositionSelectByTicket(ticket)) continue;
 
+         string dir = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+         string sym = PositionGetString(POSITION_SYMBOL);
+         double vol = PositionGetDouble(POSITION_VOLUME);
+         double opn = PositionGetDouble(POSITION_PRICE_OPEN);
          double current = PositionGetDouble(POSITION_PRICE_CURRENT);
          double profit  = PositionGetDouble(POSITION_PROFIT);
          double sl      = PositionGetDouble(POSITION_SL);
          double tp      = PositionGetDouble(POSITION_TP);
+
+         // Ensure the open position is registered in backend
+         ReportPositionOpen((long)ticket, "", sym, dir, vol, opn, sl, tp);
 
          string json = StringFormat(
             "{\"ticket\":%llu,\"current_price\":%.5f,\"profit\":%.2f,\"unrealized_profit\":%.2f,\"stop_loss\":%.5f,\"take_profit\":%.5f,\"timestamp\":\"%s\"}",
@@ -161,6 +168,33 @@ private:
          string response;
          SendHTTPPost("/api/mt5/position/update?ticket=" + IntegerToString(ticket), json, response);
          Sleep(100);
+      }
+   }
+
+   void SyncClosedTradesToday()
+   {
+      datetime start_of_day = TimeCurrent() - (TimeCurrent() % 86400); // 00:00:00 today
+      if(HistorySelect(start_of_day, TimeCurrent() + 60))
+      {
+         int total = HistoryDealsTotal();
+         if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing %d closed deals from today...", total);
+         for(int i = 0; i < total; i++)
+         {
+            ulong deal = HistoryDealGetTicket(i);
+            if(deal == 0) continue;
+            ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal, DEAL_ENTRY);
+            if(entry_type == DEAL_ENTRY_OUT || entry_type == DEAL_ENTRY_INOUT)
+            {
+               long close_ticket = (long)HistoryDealGetInteger(deal, DEAL_POSITION_ID);
+               double profit     = HistoryDealGetDouble(deal, DEAL_PROFIT);
+               double commission = HistoryDealGetDouble(deal, DEAL_COMMISSION);
+               double swap       = HistoryDealGetDouble(deal, DEAL_SWAP);
+               double exit_price = HistoryDealGetDouble(deal, DEAL_PRICE);
+
+               ReportPositionClose(close_ticket, exit_price, profit, commission, swap, "HISTORICAL");
+               Sleep(50);
+            }
+         }
       }
    }
 
@@ -269,6 +303,7 @@ public:
       m_last_heartbeat = TimeCurrent();
       SyncExistingPositions();
       SyncPendingOrders();
+      SyncClosedTradesToday();
       Print("[MT5Adapter] Adapter connected to: " + m_backend_url);
       return true;
    }
@@ -506,12 +541,13 @@ public:
             }
          }
 
-         if(HistorySelect(TimeCurrent() - 60, TimeCurrent()))
+         if(HistoryDealSelect(trans.deal))
          {
             ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
             if(entry_type == DEAL_ENTRY_OUT || entry_type == DEAL_ENTRY_INOUT)
             {
-               long ticket = (long)trans.position;
+               long close_ticket = (long)HistoryDealGetInteger(trans.deal, DEAL_POSITION_ID);
+               if(close_ticket <= 0) close_ticket = (long)trans.position;
                double profit     = HistoryDealGetDouble(trans.deal, DEAL_PROFIT);
                double commission = HistoryDealGetDouble(trans.deal, DEAL_COMMISSION);
                double swap       = HistoryDealGetDouble(trans.deal, DEAL_SWAP);
@@ -521,7 +557,7 @@ public:
                if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_SL)) < 0.0001) reason = "SL_HIT";
                if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_TP)) < 0.0001) reason = "TP_HIT";
 
-               ReportPositionClose(ticket, exit_price, profit, commission, swap, reason);
+               ReportPositionClose(close_ticket, exit_price, profit, commission, swap, reason);
             }
          }
       }
