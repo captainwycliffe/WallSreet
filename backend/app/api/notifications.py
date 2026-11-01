@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from sqlalchemy import select, desc
+from typing import List, Optional
 
 from app.db.session import get_session
 from app.core.dependencies import get_current_active_user
 from app.core.exceptions import NotFoundError
 from app.models.user import User
-from app.models.notification import PushToken
+from app.models.notification import PushToken, NotificationLog
 from app.schemas.notification import (
     PushTokenRegister,
     PushTokenResponse,
@@ -60,3 +61,24 @@ async def get_notification_history(
 ):
     repo = NotificationRepository(db)
     return await repo.get_history_for_user(current_user.id)
+
+
+@router.get("/poll", response_model=List[NotificationLogResponse])
+async def poll_notifications_background(
+    key: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_session)
+):
+    """
+    Lightweight endpoint used by the Android Native Foreground Service
+    to poll recent notifications 24/7 even when the mobile UI is closed.
+    """
+    if key != "mt5ea_demo_key_12345":
+        raise HTTPException(status_code=401, detail="Invalid background poll key")
+
+    stmt = (
+        select(NotificationLog)
+        .order_by(desc(NotificationLog.sent_at))
+        .limit(15)
+    )
+    res = await db.execute(stmt)
+    return list(res.scalars().all())

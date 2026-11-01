@@ -15,7 +15,10 @@
       "permissions": [
         "POST_NOTIFICATIONS",
         "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED"
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_DATA_SYNC",
+        "WAKE_LOCK"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -40,6 +43,7 @@
           ]
         }
       ],
+      "./plugins/withBackgroundMonitorService",
       [
         "expo-splash-screen",
         {

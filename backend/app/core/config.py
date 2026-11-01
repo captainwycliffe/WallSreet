@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-to-a-long-random-secret-key-min-32-chars"
     JWT_SECRET_KEY: str = "change-me-to-another-long-random-secret-key"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # MT5 EA Auth
