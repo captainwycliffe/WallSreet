@@ -1,7 +1,5 @@
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { useEffect } from 'react';
-import { AppState, AppStateStatus, Platform } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -12,9 +10,6 @@ import { storage } from '../services/storage';
 import { setupNotificationHandlers, registerForPushNotifications, showLocalNotification } from '../services/notifications';
 
 const queryClient = new QueryClient();
-const isStandaloneAndroid =
-  Platform.OS === 'android' &&
-  Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 export default function RootLayout() {
   const { user, isAuthenticated, loadUser, isLoading } = useAuthStore();
@@ -62,35 +57,19 @@ export default function RootLayout() {
     registerForPushNotifications();
 
     let isMounted = true;
-    const connectWs = async () => {
+    (async () => {
       const token = await storage.getAccessToken();
       if (token && isMounted) {
         wsService.connect(user.id, token);
       }
-    };
-    connectWs();
-
-    // Reconnect WS & refresh data immediately when app returns from background
-    const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      if (nextState === 'active') {
-        connectWs();
-        queryClient.invalidateQueries({ queryKey: ['trades'] });
-        queryClient.invalidateQueries({ queryKey: ['accounts'] });
-        queryClient.invalidateQueries({ queryKey: ['pois'] });
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      }
-    });
+    })();
 
     // Listen for push/in-app notification broadcasts over WebSocket
     const unsubNotification = wsService.on('NOTIFICATION', (msg: any) => {
+      const title = msg?.data?.title || 'Notification';
+      const body = msg?.data?.body || '';
+      showLocalNotification(title, body, msg?.data);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      // On standalone Android APK, the native MT5MonitorService displays
-      // the system notification 24/7 (both foreground and closed).
-      if (!isStandaloneAndroid) {
-        const title = msg?.data?.title || 'Notification';
-        const body = msg?.data?.body || '';
-        showLocalNotification(title, body, msg?.data);
-      }
     });
 
     // Auto-invalidate React Query queries on real-time events
@@ -123,7 +102,6 @@ export default function RootLayout() {
 
     return () => {
       isMounted = false;
-      appStateSub.remove();
       unsubNotification();
       unsubPoiCreated();
       unsubPoiUpdated();
