@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "670877788574",
+    "project_id": "mt5-monitor-7de9d",
+    "storage_bucket": "mt5-monitor-7de9d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:670877788574:android:4a738479448b8e09bd4e8f",
+        "android_client_info": {
+          "package_name": "com.wallsreet.mt5monitor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVRQYPndw07ZuduqlyLREvbdbT8CP-Xbc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
