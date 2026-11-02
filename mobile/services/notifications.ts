@@ -4,8 +4,8 @@ import { notificationsService } from './api';
 
 export const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-export const NORMAL_CHANNEL_ID = isExpoGo ? 'mt5_normal_expo_v3' : 'mt5_normal_v3';
-export const NEAR_ENTRY_CHANNEL_ID = isExpoGo ? 'mt5_near_entry_expo_v3' : 'mt5_near_entry_v3';
+export const NORMAL_CHANNEL_ID = 'mt5_normal_v3';
+export const NEAR_ENTRY_CHANNEL_ID = 'mt5_near_entry_v3';
 
 export const NORMAL_SOUND_NAME = 'normal_notification.wav';
 export const NEAR_ENTRY_SOUND_NAME = 'near_entry_alert.wav';
@@ -14,8 +14,7 @@ export const NEAR_ENTRY_SOUND_NAME = 'near_entry_alert.wav';
 // executes DevicePushTokenAutoRegistration.fx.js at module load time, which calls
 // warnOfExpoGoPushUsage() and throws an Error on Android inside Expo Go!
 // By loading the local notification submodules directly, local notifications,
-// Android notification channels, permissions, and foreground banners work 100%
-// natively in BOTH Expo Go and standalone APK builds.
+// permissions, and foreground banners work 100% natively in BOTH Expo Go and standalone APK builds.
 let scheduleNotificationAsyncFn: any = null;
 let setNotificationChannelAsyncFn: any = null;
 let setNotificationHandlerFn: any = null;
@@ -25,6 +24,20 @@ let addNotificationReceivedListenerFn: any = null;
 let addNotificationResponseReceivedListenerFn: any = null;
 let AndroidImportanceEnum: any = { MAX: 5, HIGH: 4, DEFAULT: 3 };
 let SchedulableTriggerInputTypesEnum: any = { TIME_INTERVAL: 'timeInterval', DATE: 'date' };
+
+export async function playCustomSound(isNearEntry: boolean): Promise<void> {
+  try {
+    const { createAudioPlayer, setAudioModeAsync } = require('expo-audio');
+    await setAudioModeAsync({ playsInSilentMode: true });
+    const soundAsset = isNearEntry
+      ? require('../assets/sounds/near_entry_alert.wav')
+      : require('../assets/sounds/normal_notification.wav');
+    const player = createAudioPlayer(soundAsset);
+    player.play();
+  } catch (e) {
+    console.warn('Audio playback error:', e);
+  }
+}
 
 try {
   scheduleNotificationAsyncFn = require('expo-notifications/build/scheduleNotificationAsync').scheduleNotificationAsync;
@@ -59,22 +72,18 @@ export async function ensureNotificationPermissions(): Promise<boolean> {
 }
 
 export async function ensureNotificationChannels(): Promise<void> {
-  if (!setNotificationChannelAsyncFn || Platform.OS !== 'android') return;
+  // In Expo Go on Android, NotificationsChannelsProvider is null and throws NullPointerException.
+  // Custom notification channels & custom .wav sounds are only supported in standalone APK builds.
+  if (isExpoGo || !setNotificationChannelAsyncFn || Platform.OS !== 'android') return;
 
   try {
-    // Note: In Expo Go, custom .wav files are not compiled into Expo Go's native res/raw/ folder,
-    // so passing a custom filename on Android in Expo Go plays silence. Use 'default' in Expo Go
-    // and the bundled 3s / 9s .wav files in the standalone APK.
-    const normalSound = isExpoGo ? 'default' : NORMAL_SOUND_NAME;
-    const nearEntrySound = isExpoGo ? 'default' : NEAR_ENTRY_SOUND_NAME;
-
     // 1. Normal 3-second notification channel (trade open, close, limit filled)
     await setNotificationChannelAsyncFn(NORMAL_CHANNEL_ID, {
       name: 'Trade Alerts (3s Standard)',
       importance: AndroidImportanceEnum.MAX,
       vibrationPattern: [0, 250, 200, 250],
       lightColor: '#00C896',
-      sound: normalSound,
+      sound: NORMAL_SOUND_NAME,
       enableVibrate: true,
       showBadge: true,
     });
@@ -85,7 +94,7 @@ export async function ensureNotificationChannels(): Promise<void> {
       importance: AndroidImportanceEnum.MAX,
       vibrationPattern: [0, 500, 200, 500, 200, 500],
       lightColor: '#FFB800',
-      sound: nearEntrySound,
+      sound: NEAR_ENTRY_SOUND_NAME,
       enableVibrate: true,
       showBadge: true,
     });
@@ -104,7 +113,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
     // Remote FCM push tokens are only supported in standalone APK / development builds (not Expo Go)
     if (isExpoGo) {
-      console.log('Running in Expo Go: local OS notifications & WebSocket live alerts enabled (remote FCM push requires APK).');
       return null;
     }
 
@@ -119,8 +127,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
       Constants?.expoConfig?.android?.package ??
       'com.wallsreet.mt5monitor';
 
-    // Explicitly pass both projectId and applicationId so getExpoPushTokenAsync
-    // does not fail if expo-application native module is absent
     const tokenData = await getExpoPushTokenAsync({
       projectId,
       applicationId,
@@ -161,7 +167,13 @@ export function setupNotificationHandlers(): void {
     });
 
     if (addNotificationReceivedListenerFn) {
-      addNotificationReceivedListenerFn(() => {});
+      addNotificationReceivedListenerFn((notification: any) => {
+        if (isExpoGo) {
+          const type = notification?.request?.content?.data?.type;
+          const isNear = type === 'PRICE_NEAR_ENTRY';
+          playCustomSound(isNear);
+        }
+      });
     }
     if (addNotificationResponseReceivedListenerFn) {
       addNotificationResponseReceivedListenerFn(() => {});
@@ -171,13 +183,29 @@ export function setupNotificationHandlers(): void {
   }
 }
 
+let lastDisplayedNotifTime = 0;
+let lastDisplayedNotifTitle = '';
+
 export async function showLocalNotification(title: string, body: string, data?: any): Promise<void> {
+  // Prevent duplicate double-firing within 1.5s if both WS and fallback trigger
+  const now = Date.now();
+  if (title === lastDisplayedNotifTitle && now - lastDisplayedNotifTime < 1500) {
+    return;
+  }
+  lastDisplayedNotifTime = now;
+  lastDisplayedNotifTitle = title;
+
   const isNearEntry =
     data?.type === 'PRICE_NEAR_ENTRY' ||
     title?.toLowerCase().includes('near entry');
 
   const soundName = isExpoGo ? 'default' : (isNearEntry ? NEAR_ENTRY_SOUND_NAME : NORMAL_SOUND_NAME);
   const channelId = isNearEntry ? NEAR_ENTRY_CHANNEL_ID : NORMAL_CHANNEL_ID;
+  const useAndroidChannel = !isExpoGo && Platform.OS === 'android';
+
+  if (isExpoGo) {
+    playCustomSound(isNearEntry);
+  }
 
   if (scheduleNotificationAsyncFn) {
     try {
@@ -189,20 +217,20 @@ export async function showLocalNotification(title: string, body: string, data?: 
           body,
           data: data || {},
           sound: soundName,
-          ...(Platform.OS === 'android' ? { channelId } : {}),
+          ...(useAndroidChannel ? { channelId } : {}),
         },
-        trigger: Platform.OS === 'android' ? { channelId } : null,
+        // In Expo Go on Android, trigger must be null (channel trigger crashes NotificationsChannelsProvider)
+        trigger: useAndroidChannel ? { channelId } : null,
       });
       return;
     } catch (e) {
-      console.warn('Channel trigger failed, retrying with null trigger:', e);
       try {
         await scheduleNotificationAsyncFn({
           content: {
             title,
             body,
             data: data || {},
-            sound: soundName,
+            sound: 'default',
           },
           trigger: null,
         });
@@ -213,7 +241,6 @@ export async function showLocalNotification(title: string, body: string, data?: 
     }
   }
 
-  // Final fallback in-app alert if OS notifications are blocked
   Alert.alert(title, body);
 }
 
@@ -226,6 +253,7 @@ export async function scheduleDelayedLocalNotification(
   if (!scheduleNotificationAsyncFn) return false;
   const soundName = isExpoGo ? 'default' : (isNearEntry ? NEAR_ENTRY_SOUND_NAME : NORMAL_SOUND_NAME);
   const channelId = isNearEntry ? NEAR_ENTRY_CHANNEL_ID : NORMAL_CHANNEL_ID;
+  const useAndroidChannel = !isExpoGo && Platform.OS === 'android';
 
   try {
     await ensureNotificationChannels();
@@ -236,13 +264,13 @@ export async function scheduleDelayedLocalNotification(
         body,
         data: { type: isNearEntry ? 'PRICE_NEAR_ENTRY' : 'TRADE_OPENED', delayedTest: true },
         sound: soundName,
-        ...(Platform.OS === 'android' ? { channelId } : {}),
+        ...(useAndroidChannel ? { channelId } : {}),
       },
       trigger: {
         type: SchedulableTriggerInputTypesEnum.TIME_INTERVAL,
         seconds,
         repeats: false,
-        ...(Platform.OS === 'android' ? { channelId } : {}),
+        ...(useAndroidChannel ? { channelId } : {}),
       },
     });
     return true;

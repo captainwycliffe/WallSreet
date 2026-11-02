@@ -11,3 +11,5 @@ scratch/
 .claude/
 
 *firebase-adminsdk*.json
+
+.env.local

@@ -7,7 +7,9 @@ import {
   isExpoGo,
   ensureNotificationPermissions,
   registerForPushNotifications,
+  showLocalNotification,
   scheduleDelayedLocalNotification,
+  playCustomSound,
 } from '../../../../services/notifications';
 import { notificationsService, PushTokenRecord } from '../../../../services/api';
 import { wsService } from '../../../../services/websocket';
@@ -92,15 +94,26 @@ export default function SettingsScreen() {
     setTestingType(type);
     setLastDiag(null);
     try {
+      const isNearEntry = type === 'PRICE_NEAR_ENTRY';
+      const title = isNearEntry
+        ? '⚠️ Price Alert: Near Entry (Test)'
+        : '📈 Trade Activated (Test)';
+      const body = isNearEntry
+        ? 'XAUUSD.m is near your BUY_LIMIT entry! Current: 3021.20 (Entry: 3020.00)'
+        : 'XAUUSD.m BUY 0.2 lots opened @ 3020.00';
+
+      // 1. Trigger local OS banner immediately so user sees & hears it right away
+      await showLocalNotification(title, body, { type });
+
+      // 2. Also dispatch via backend API (which logs & broadcasts over WS/FCM)
       const res = await notificationsService.sendTest(type);
       await refreshDiagnostics();
       const summary = [
+        `OS Banner Displayed: YES`,
         `Server Dispatch: ${res.success ? 'SUCCESS' : 'FAILED'}`,
-        `WebSocket Connections: ${res.ws_connections}`,
-        `Registered FCM Tokens: ${res.tokens_registered}`,
-        `FCM Push Sent: ${res.push_sent ? 'YES' : isExpoGo ? 'N/A (Expo Go uses WS)' : 'NO'}`,
-        `Channel: ${res.channel_id}`,
-        `Sound: ${res.sound}`,
+        `WebSocket Stream: ${wsService.isConnected() ? 'CONNECTED' : 'RECONNECTING'}`,
+        `Target Channel: ${res.channel_id}`,
+        `APK Sound: ${res.sound}`,
         ...(res.push_errors?.length ? [`Errors: ${res.push_errors.join(', ')}`] : []),
       ].join('\n');
       setLastDiag(summary);
@@ -231,6 +244,26 @@ export default function SettingsScreen() {
             )}
           </TouchableOpacity>
 
+          <View style={styles.soundPreviewRow}>
+            <TouchableOpacity
+              style={[styles.soundBtn, { borderColor: C.green }]}
+              onPress={() => playCustomSound(false)}
+            >
+              <Text style={[styles.soundBtnText, { color: C.green }]}>
+                🔊 Play 3s Sound
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.soundBtn, { borderColor: C.amber }]}
+              onPress={() => playCustomSound(true)}
+            >
+              <Text style={[styles.soundBtnText, { color: C.amber }]}>
+                🔊 Play 9s Sound
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {lastDiag && (
             <View style={styles.diagBox}>
               <Text style={styles.diagText}>{lastDiag}</Text>
@@ -328,6 +361,25 @@ const styles = StyleSheet.create({
   testBtnText: {
     fontWeight: '600',
     fontSize: 13,
+  },
+  soundPreviewRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  soundBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.surface,
+  },
+  soundBtnText: {
+    fontWeight: '600',
+    fontSize: 12,
   },
   diagBox: {
     marginTop: 8,

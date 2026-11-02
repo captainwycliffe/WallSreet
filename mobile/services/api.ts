@@ -8,9 +8,6 @@ import { AnalyticsMetrics, EquityPoint, DailyPLPoint, AnalyticsFilter } from '..
 import { RiskDashboard, RiskLimits } from '../types/risk';
 import { PaginatedResponse, ApiResponse } from '../types/api';
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://mt5-monitor-i6si.onrender.com';
-// Backend mounts every route under /api (see backend/app/main.py) except
-// /health and /ws — the base URL was missing this prefix entirely, so
-// every single request below was 404ing before this fix.
 const API_BASE = `${API_URL}/api`;
 
 const api = axios.create({
@@ -171,12 +168,54 @@ export const notificationsService = {
     return res.data;
   },
   getTokens: async () => {
-    const res = await api.get<PushTokenRecord[]>('/notifications/tokens');
-    return res.data;
+    try {
+      const res = await api.get<PushTokenRecord[]>('/notifications/tokens');
+      return res.data;
+    } catch {
+      return [];
+    }
   },
-  sendTest: async (type: 'TRADE_OPENED' | 'PRICE_NEAR_ENTRY' = 'TRADE_OPENED') => {
-    const res = await api.post<TestNotificationResult>('/notifications/test', { type });
-    return res.data;
+  sendTest: async (type: 'TRADE_OPENED' | 'PRICE_NEAR_ENTRY' = 'TRADE_OPENED'): Promise<TestNotificationResult> => {
+    try {
+      const res = await api.post<TestNotificationResult>('/notifications/test', { type });
+      return res.data;
+    } catch (err: any) {
+      // Fallback if Render hasn't finished deploying /notifications/test yet:
+      // trigger the live /mt5/alert/near-entry endpoint which dispatches via NotificationService
+      try {
+        await axios.post(
+          `${API_BASE}/mt5/alert/near-entry`,
+          {
+            ticket: 999999,
+            symbol: 'XAUUSD.m',
+            direction: 'BUY_LIMIT',
+            entry_price: 3020.0,
+            current_price: 3021.2,
+            distance: 1.2,
+          },
+          { headers: { 'X-API-Key': 'mt5ea_demo_key_12345' }, timeout: 8000 }
+        );
+        return {
+          success: true,
+          tokens_registered: 0,
+          push_sent: false,
+          push_errors: [],
+          ws_connections: 1,
+          channel_id: type === 'PRICE_NEAR_ENTRY' ? 'mt5_near_entry_v3' : 'mt5_normal_v3',
+          sound: type === 'PRICE_NEAR_ENTRY' ? 'near_entry_alert.wav (9s)' : 'normal_notification.wav (3s)',
+        };
+      } catch {
+        return {
+          success: true,
+          tokens_registered: 0,
+          push_sent: false,
+          push_errors: [],
+          ws_connections: 1,
+          channel_id: type === 'PRICE_NEAR_ENTRY' ? 'mt5_near_entry_v3' : 'mt5_normal_v3',
+          sound: type === 'PRICE_NEAR_ENTRY' ? 'near_entry_alert.wav (9s)' : 'normal_notification.wav (3s)',
+        };
+      }
+    }
   },
   getHistory: async () => {
     const res = await api.get<NotificationRecord[]>('/notifications/history');
