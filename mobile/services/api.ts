@@ -147,16 +147,6 @@ export const journalService = {
 
 export interface PushTokenRecord { id: string; token: string; platform: 'ios' | 'android'; is_active: boolean; }
 export interface NotificationRecord { id: string; type: string; title: string; body: string; data?: Record<string, any>; sent_at: string; success: boolean; }
-export interface TestNotificationResult {
-  success: boolean;
-  tokens_registered: number;
-  push_sent: boolean;
-  push_errors: string[];
-  ws_connections: number;
-  channel_id: string;
-  sound: string;
-  log_id?: string;
-}
 
 export const notificationsService = {
   registerToken: async (token: string, platform: 'ios' | 'android') => {
@@ -173,48 +163,6 @@ export const notificationsService = {
       return res.data;
     } catch {
       return [];
-    }
-  },
-  sendTest: async (type: 'TRADE_OPENED' | 'PRICE_NEAR_ENTRY' = 'TRADE_OPENED'): Promise<TestNotificationResult> => {
-    try {
-      const res = await api.post<TestNotificationResult>('/notifications/test', { type });
-      return res.data;
-    } catch (err: any) {
-      // Fallback if Render hasn't finished deploying /notifications/test yet:
-      // trigger the live /mt5/alert/near-entry endpoint which dispatches via NotificationService
-      try {
-        await axios.post(
-          `${API_BASE}/mt5/alert/near-entry`,
-          {
-            ticket: 999999,
-            symbol: 'XAUUSD.m',
-            direction: 'BUY_LIMIT',
-            entry_price: 3020.0,
-            current_price: 3021.2,
-            distance: 1.2,
-          },
-          { headers: { 'X-API-Key': 'mt5ea_demo_key_12345' }, timeout: 8000 }
-        );
-        return {
-          success: true,
-          tokens_registered: 0,
-          push_sent: false,
-          push_errors: [],
-          ws_connections: 1,
-          channel_id: type === 'PRICE_NEAR_ENTRY' ? 'mt5_near_entry_v3' : 'mt5_normal_v3',
-          sound: type === 'PRICE_NEAR_ENTRY' ? 'near_entry_alert.wav (9s)' : 'normal_notification.wav (3s)',
-        };
-      } catch {
-        return {
-          success: true,
-          tokens_registered: 0,
-          push_sent: false,
-          push_errors: [],
-          ws_connections: 1,
-          channel_id: type === 'PRICE_NEAR_ENTRY' ? 'mt5_near_entry_v3' : 'mt5_normal_v3',
-          sound: type === 'PRICE_NEAR_ENTRY' ? 'near_entry_alert.wav (9s)' : 'normal_notification.wav (3s)',
-        };
-      }
     }
   },
   getHistory: async () => {

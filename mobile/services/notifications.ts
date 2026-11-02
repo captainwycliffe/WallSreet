@@ -243,39 +243,3 @@ export async function showLocalNotification(title: string, body: string, data?: 
 
   Alert.alert(title, body);
 }
-
-export async function scheduleDelayedLocalNotification(
-  title: string,
-  body: string,
-  seconds: number = 5,
-  isNearEntry: boolean = false
-): Promise<boolean> {
-  if (!scheduleNotificationAsyncFn) return false;
-  const soundName = isExpoGo ? 'default' : (isNearEntry ? NEAR_ENTRY_SOUND_NAME : NORMAL_SOUND_NAME);
-  const channelId = isNearEntry ? NEAR_ENTRY_CHANNEL_ID : NORMAL_CHANNEL_ID;
-  const useAndroidChannel = !isExpoGo && Platform.OS === 'android';
-
-  try {
-    await ensureNotificationChannels();
-    await ensureNotificationPermissions();
-    await scheduleNotificationAsyncFn({
-      content: {
-        title,
-        body,
-        data: { type: isNearEntry ? 'PRICE_NEAR_ENTRY' : 'TRADE_OPENED', delayedTest: true },
-        sound: soundName,
-        ...(useAndroidChannel ? { channelId } : {}),
-      },
-      trigger: {
-        type: SchedulableTriggerInputTypesEnum.TIME_INTERVAL,
-        seconds,
-        repeats: false,
-        ...(useAndroidChannel ? { channelId } : {}),
-      },
-    });
-    return true;
-  } catch (e) {
-    console.warn('Failed to schedule delayed notification:', e);
-    return false;
-  }
-}
