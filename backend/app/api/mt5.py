@@ -96,7 +96,8 @@ async def heartbeat(
             if order_ticket and order_ticket not in payload.pending_tickets:
                 p.status = POIStatus.EXPIRED
                 if not p.closed_at:
-                    p.closed_at = now
+                    t_now = now
+                    p.closed_at = t_now
 
     await db.commit()
     return {"status": "ok"}
@@ -279,14 +280,17 @@ async def close_position(
         acc = acc_res.scalar_one_or_none()
         if acc:
             p_sign = "+" if (trade.net_profit or 0) >= 0 else ""
+            exit_f = float(trade.exit_price or 0.0)
+            exit_str = f"{exit_f:.2f}" if exit_f > 100 else f"{exit_f:.5f}"
+            lots_str = f"{round(float(trade.volume or 0.01), 4):g}"
             title = f"💰 Trade Closed ({p_sign}${trade.net_profit:.2f})"
-            body = f"{trade.symbol} #{ticket} closed at {trade.exit_price:.5f} (P/L: {p_sign}${trade.net_profit:.2f})"
+            body = f"{trade.symbol} {lots_str} lots (#{ticket}) closed at {exit_str} (P/L: {p_sign}${trade.net_profit:.2f})"
             await notif_service.send_to_user(
                 user_id=acc.user_id,
                 notif_type="TRADE_CLOSED",
                 title=title,
                 body=body,
-                data={"ticket": ticket, "net_profit": trade.net_profit}
+                data={"ticket": ticket, "symbol": trade.symbol, "net_profit": trade.net_profit}
             )
     except Exception as e:
         logger.warning("Failed to send trade closed notification: %s", e)

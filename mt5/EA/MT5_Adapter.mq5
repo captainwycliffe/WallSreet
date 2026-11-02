@@ -7,7 +7,7 @@
 //+------------------------------------------------------------------+
 #property copyright "MT5 Trade Monitor"
 #property link      "https://github.com/captainwycliffe/WallSreet"
-#property version   "1.42"
+#property version   "1.43"
 #property strict
 
 // ─── Input Parameters ──────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ private:
       pending_tickets_json += "]";
 
       string json = StringFormat(
-         "{\"timestamp\":\"%s\",\"version\":\"1.4.2\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"margin\":%.2f,\"free_margin\":%.2f,\"open_pl\":%.2f,\"open_positions\":%d,\"open_tickets\":%s,\"pending_tickets\":%s}",
+         "{\"timestamp\":\"%s\",\"version\":\"1.4.3\",\"account_balance\":%.2f,\"account_equity\":%.2f,\"margin\":%.2f,\"free_margin\":%.2f,\"open_pl\":%.2f,\"open_positions\":%d,\"open_tickets\":%s,\"pending_tickets\":%s}",
          TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS),
          balance, equity, margin, free_m, open_pl, positions, tickets_json, pending_tickets_json
       );
@@ -300,6 +300,9 @@ public:
       m_last_heartbeat       = 0;
       m_last_position_update = 0;
       m_update_interval_secs = 3;
+      m_last_near_entry_check = 0;
+      m_last_alert_time      = 0;
+      m_last_alert_ticket    = 0;
    }
 
    bool Initialize()
@@ -332,6 +335,7 @@ public:
             dir = "SELL";
 
          string symbol   = OrderGetString(ORDER_SYMBOL);
+         SymbolSelect(symbol, true);
          double entry    = OrderGetDouble(ORDER_PRICE_OPEN);
          double point    = SymbolInfoDouble(symbol, SYMBOL_POINT);
          double bid      = SymbolInfoDouble(symbol, SYMBOL_BID);
@@ -339,8 +343,14 @@ public:
          double current  = (dir == "BUY") ? ask : bid;
          double diff     = MathAbs(current - entry);
 
-         // Threshold: Gold <= $1.50 (150 pts), FX <= 70 pts (7 pips)
-         double threshold = (StringFind(symbol, "XAU") >= 0 || StringFind(symbol, "GOLD") >= 0) ? 1.50 : (point * 70);
+         // Configurable distance threshold based on symbol class
+         double threshold = point * (FX_ALERT_PIPS * 10.0);
+         if(StringFind(symbol, "XAU") >= 0 || StringFind(symbol, "GOLD") >= 0)
+            threshold = GOLD_ALERT_USD;
+         else if(StringFind(symbol, "BTC") >= 0)
+            threshold = BTC_ALERT_USD;
+         else if(StringFind(symbol, "NAS") >= 0 || StringFind(symbol, "US30") >= 0 || StringFind(symbol, "US500") >= 0 || StringFind(symbol, "USTEC") >= 0)
+            threshold = INDEX_ALERT_PTS;
 
          if(diff <= threshold && diff > 0)
          {
@@ -461,7 +471,7 @@ public:
          "\"mt5_ticket\":%lld,"
          "\"symbol\":\"%s\","
          "\"direction\":\"%s\","
-         "\"volume\":%.2f,"
+         "\"volume\":%.4f,"
          "\"entry_price\":%.5f,"
          "\"stop_loss\":%.5f,"
          "\"take_profit\":%.5f,"

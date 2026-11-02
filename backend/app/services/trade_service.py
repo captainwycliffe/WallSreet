@@ -42,6 +42,7 @@ class TradeService:
         idem_key = req.idempotency_key or f"pos_open_{ticket_val}"
 
         existing = await self.repo.get_by_ticket(ticket_val) or await self.repo.get_by_idempotency_key(idem_key)
+        was_placeholder = False
         if existing:
             if existing.symbol == "MT5_TRADE" and req.symbol and req.symbol != "MT5_TRADE":
                 existing.symbol = req.symbol
@@ -52,25 +53,27 @@ class TradeService:
                     existing.stop_loss = req.stop_loss
                 if req.take_profit is not None:
                     existing.take_profit = req.take_profit
-                existing = await self.repo.update(existing)
-            return existing
-            
-        trade = Trade(
-            account_id=account_id,
-            poi_id=req.poi_id if req.poi_id and len(req.poi_id) > 5 else None,
-            mt5_ticket=ticket_val,
-            symbol=req.symbol,
-            direction=req.direction,
-            volume=volume_val,
-            entry_price=req.entry_price,
-            stop_loss=req.stop_loss if req.stop_loss is not None else 0.0,
-            take_profit=req.take_profit if req.take_profit is not None else 0.0,
-            current_price=req.current_price if req.current_price is not None else req.entry_price,
-            opened_at=req.opened_at or datetime.utcnow(),
-            status=TradeStatus.OPEN,
-            idempotency_key=idem_key
-        )
-        trade = await self.repo.create(trade)
+                trade = await self.repo.update(existing)
+                was_placeholder = True
+            else:
+                return existing
+        else:
+            trade = Trade(
+                account_id=account_id,
+                poi_id=req.poi_id if req.poi_id and len(req.poi_id) > 5 else None,
+                mt5_ticket=ticket_val,
+                symbol=req.symbol,
+                direction=req.direction,
+                volume=volume_val,
+                entry_price=req.entry_price,
+                stop_loss=req.stop_loss if req.stop_loss is not None else 0.0,
+                take_profit=req.take_profit if req.take_profit is not None else 0.0,
+                current_price=req.current_price if req.current_price is not None else req.entry_price,
+                opened_at=req.opened_at or datetime.utcnow(),
+                status=TradeStatus.OPEN,
+                idempotency_key=idem_key
+            )
+            trade = await self.repo.create(trade)
         
         await event_bus.emit("POSITION_OPENED", {
             "account_id": account_id,

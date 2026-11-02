@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 from datetime import datetime
 from app.models.notification import Platform
 
@@ -28,3 +28,18 @@ class NotificationLogResponse(BaseModel):
     success: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TestNotificationRequest(BaseModel):
+    type: str = "TRADE_OPENED"
+
+
+class TestNotificationResponse(BaseModel):
+    success: bool
+    tokens_registered: int
+    push_sent: bool
+    push_errors: List[str] = []
+    ws_connections: int
+    channel_id: str
+    sound: str
+    log_id: Optional[str] = None

@@ -58,8 +58,11 @@ class POIService:
                 entry_f = float(poi.entry_price)
                 sl_f = float(poi.stop_loss)
                 tp_f = float(poi.take_profit)
-                title = f"🔔 Limit Order Placed"
-                body = f"{poi.symbol} {poi.poi_type} placed @ {entry_f:.2f if entry_f > 100 else entry_f:.5f} (SL: {sl_f:.2f if sl_f > 100 else sl_f:.5f}, TP: {tp_f:.2f if tp_f > 100 else tp_f:.5f})"
+                entry_str = f"{entry_f:.2f}" if entry_f > 100 else f"{entry_f:.5f}"
+                sl_str = f"{sl_f:.2f}" if sl_f > 100 else f"{sl_f:.5f}"
+                tp_str = f"{tp_f:.2f}" if tp_f > 100 else f"{tp_f:.5f}"
+                title = "🔔 Limit Order Placed"
+                body = f"{poi.symbol} {poi.poi_type} placed @ {entry_str} (SL: {sl_str}, TP: {tp_str})"
                 await self.notif_service.send_to_user(
                     user_id=acc.user_id,
                     notif_type="LIMIT_PLACED",
@@ -93,8 +96,9 @@ class POIService:
                 acc = acc_res.scalar_one_or_none()
                 if acc:
                     entry_f = float(poi.entry_price)
-                    title = f"⚡ Limit Order Activated"
-                    body = f"{poi.symbol} limit triggered and filled at {entry_f:.2f if entry_f > 100 else entry_f:.5f}!"
+                    entry_str = f"{entry_f:.2f}" if entry_f > 100 else f"{entry_f:.5f}"
+                    title = "⚡ Limit Order Activated"
+                    body = f"{poi.symbol} limit triggered and filled at {entry_str}!"
                     await self.notif_service.send_to_user(
                         user_id=acc.user_id,
                         notif_type="LIMIT_ACTIVATED",

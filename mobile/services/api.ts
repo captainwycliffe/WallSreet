@@ -50,9 +50,6 @@ api.interceptors.response.use(
 
 export const authService = {
   login: async (data: LoginRequest) => {
-    // Backend's LoginRequest schema is JSON {email, password} — this used
-    // to POST OAuth2-style form-urlencoded {username, password}, which
-    // doesn't match anything the backend actually implements.
     const res = await api.post<AuthTokens>('/auth/login', data);
     return res.data;
   },
@@ -61,7 +58,6 @@ export const authService = {
     return res.data;
   },
   getMe: async () => {
-    // Backend route is /auth/me, not /users/me.
     const res = await api.get<User>('/auth/me');
     return res.data;
   },
@@ -110,8 +106,6 @@ export const analyticsService = {
     return res.data;
   },
   getEquityCurve: async (params?: AnalyticsFilter) => {
-    // Backend returns { equity_curve, daily_pl } together, not a bare
-    // EquityPoint[] — this used to be typed as if it were the latter.
     const res = await api.get<{ equity_curve: EquityPoint[]; daily_pl: DailyPLPoint[] }>('/analytics/equity-curve', { params });
     return res.data;
   },
@@ -156,6 +150,16 @@ export const journalService = {
 
 export interface PushTokenRecord { id: string; token: string; platform: 'ios' | 'android'; is_active: boolean; }
 export interface NotificationRecord { id: string; type: string; title: string; body: string; data?: Record<string, any>; sent_at: string; success: boolean; }
+export interface TestNotificationResult {
+  success: boolean;
+  tokens_registered: number;
+  push_sent: boolean;
+  push_errors: string[];
+  ws_connections: number;
+  channel_id: string;
+  sound: string;
+  log_id?: string;
+}
 
 export const notificationsService = {
   registerToken: async (token: string, platform: 'ios' | 'android') => {
@@ -164,6 +168,14 @@ export const notificationsService = {
   },
   unregisterToken: async (token: string) => {
     const res = await api.delete<PushTokenRecord>(`/notifications/token/${encodeURIComponent(token)}`);
+    return res.data;
+  },
+  getTokens: async () => {
+    const res = await api.get<PushTokenRecord[]>('/notifications/tokens');
+    return res.data;
+  },
+  sendTest: async (type: 'TRADE_OPENED' | 'PRICE_NEAR_ENTRY' = 'TRADE_OPENED') => {
+    const res = await api.post<TestNotificationResult>('/notifications/test', { type });
     return res.data;
   },
   getHistory: async () => {

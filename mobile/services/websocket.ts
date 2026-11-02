@@ -8,6 +8,10 @@ class WebSocketService {
   private isIntentionalDisconnect = false;
   private pingInterval: any = null;
 
+  isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
   connect(userId: string, token: string): void {
     const wsUrl = process.env.EXPO_PUBLIC_WS_URL || 'wss://mt5-monitor-i6si.onrender.com/ws';
     this.isIntentionalDisconnect = false;

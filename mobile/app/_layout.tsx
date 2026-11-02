@@ -16,9 +16,6 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  // SDK 57 / RN 0.86 fix: navigation must not be called before the root
-  // navigation container has mounted. useRootNavigationState().key is
-  // undefined until the navigator is ready.
   const navigationState = useRootNavigationState();
   const navigationReady = !!navigationState?.key;
 
@@ -34,7 +31,6 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    // Wait until the nav root is mounted, fonts are loaded, and auth is resolved
     if (!navigationReady || isLoading || !fontsLoaded) return;
 
     const inAuthGroup = segments[0] === '(auth)';
@@ -69,7 +65,7 @@ export default function RootLayout() {
       const title = msg?.data?.title || 'Notification';
       const body = msg?.data?.body || '';
       showLocalNotification(title, body, msg?.data);
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notificationHistory'] });
     });
 
     // Auto-invalidate React Query queries on real-time events
