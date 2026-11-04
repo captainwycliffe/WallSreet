@@ -7,7 +7,7 @@ from app.models.account import EARegistration, MT5Account, EARegistrationStatus
 from app.models.poi import POI, POIStatus
 from app.models.trade import Trade, TradeStatus, TradeDirection
 from app.schemas.poi import POICreate, POIResponse, POIUpdate
-from app.schemas.trade import TradeCreate, TradeResponse, TradeUpdate, TradeClose
+from app.schemas.trade import TradeCreate, TradeResponse, TradeUpdate, TradeClose, HistoricalSyncPayload
 from app.schemas.event import HeartbeatPayload
 from app.services.poi_service import POIService
 from app.services.trade_service import TradeService
@@ -226,14 +226,16 @@ async def close_position(
     from app.repositories.trade_repo import TradeRepository
     repo = TradeRepository(db)
     trade = await repo.get_by_ticket(ticket)
+    closed_time = req.closed_at or datetime.utcnow()
+    opened_time = req.opened_at or closed_time
+
     if not trade:
-        closed_time = req.closed_at or datetime.utcnow()
         trade = Trade(
             account_id=ea.account_id,
             mt5_ticket=ticket,
             symbol=req.symbol or "MT5_TRADE",
             direction=req.direction or TradeDirection.BUY,
-            volume=req.volume or 0.01,
+            volume=round(req.volume or 0.01, 4),
             entry_price=req.entry_price if req.entry_price is not None else req.exit_price,
             stop_loss=0.0,
             take_profit=0.0,
@@ -244,21 +246,30 @@ async def close_position(
             swap=req.swap,
             net_profit=req.profit + req.commission + req.swap,
             status=TradeStatus.CLOSED,
-            opened_at=closed_time,
+            opened_at=opened_time,
             closed_at=closed_time,
             idempotency_key=req.idempotency_key or f"pos_close_{ticket}"
         )
         trade = await repo.create(trade)
     else:
-        if trade.status == TradeStatus.CLOSED:
-            return trade
+        if req.symbol and trade.symbol == "MT5_TRADE":
+            trade.symbol = req.symbol
+        if req.direction:
+            trade.direction = req.direction
+        if req.volume is not None:
+            trade.volume = round(req.volume, 4)
+        if req.entry_price is not None:
+            trade.entry_price = req.entry_price
+        if req.opened_at and trade.opened_at == trade.closed_at:
+            trade.opened_at = opened_time
+
         trade.current_price = req.exit_price
         trade.exit_price = req.exit_price
         trade.profit = req.profit
         trade.commission = req.commission
         trade.swap = req.swap
         trade.net_profit = req.profit + req.commission + req.swap
-        trade.closed_at = req.closed_at or datetime.utcnow()
+        trade.closed_at = closed_time
         trade.status = TradeStatus.CLOSED
         await repo.update(trade)
 
@@ -273,29 +284,100 @@ async def close_position(
         "net_profit": trade.net_profit,
     })
 
-    try:
-        from app.services.notification_service import NotificationService
-        notif_service = NotificationService(db)
-        acc_res = await db.execute(select(MT5Account).where(MT5Account.id == ea.account_id))
-        acc = acc_res.scalar_one_or_none()
-        if acc:
-            p_sign = "+" if (trade.net_profit or 0) >= 0 else ""
-            exit_f = float(trade.exit_price or 0.0)
-            exit_str = f"{exit_f:.2f}" if exit_f > 100 else f"{exit_f:.5f}"
-            lots_str = f"{round(float(trade.volume or 0.01), 4):g}"
-            title = f"💰 Trade Closed ({p_sign}${trade.net_profit:.2f})"
-            body = f"{trade.symbol} {lots_str} lots (#{ticket}) closed at {exit_str} (P/L: {p_sign}${trade.net_profit:.2f})"
-            await notif_service.send_to_user(
-                user_id=acc.user_id,
-                notif_type="TRADE_CLOSED",
-                title=title,
-                body=body,
-                data={"ticket": ticket, "symbol": trade.symbol, "net_profit": trade.net_profit}
-            )
-    except Exception as e:
-        logger.warning("Failed to send trade closed notification: %s", e)
+    # Only send live push notifications for real-time close events, not historical backfills
+    if req.close_reason != "HISTORICAL":
+        try:
+            from app.services.notification_service import NotificationService
+            notif_service = NotificationService(db)
+            acc_res = await db.execute(select(MT5Account).where(MT5Account.id == ea.account_id))
+            acc = acc_res.scalar_one_or_none()
+            if acc:
+                p_sign = "+" if (trade.net_profit or 0) >= 0 else ""
+                exit_f = float(trade.exit_price or 0.0)
+                exit_str = f"{exit_f:.2f}" if exit_f > 100 else f"{exit_f:.5f}"
+                lots_str = f"{round(float(trade.volume or 0.01), 4):g}"
+                title = f"💰 Trade Closed ({p_sign}${trade.net_profit:.2f})"
+                body = f"{trade.symbol} {lots_str} lots (#{ticket}) closed at {exit_str} (P/L: {p_sign}${trade.net_profit:.2f})"
+                await notif_service.send_to_user(
+                    user_id=acc.user_id,
+                    notif_type="TRADE_CLOSED",
+                    title=title,
+                    body=body,
+                    data={"ticket": ticket, "symbol": trade.symbol, "net_profit": trade.net_profit}
+                )
+        except Exception as e:
+            logger.warning("Failed to send trade closed notification: %s", e)
 
     return trade
+
+@router.post("/history/sync")
+async def sync_history(
+    payload: HistoricalSyncPayload,
+    ea: EARegistration = Depends(get_ea_from_api_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Batch-sync historical closed trades from MT5 terminal into the database."""
+    from app.repositories.trade_repo import TradeRepository
+    repo = TradeRepository(db)
+    synced_count = 0
+    now = datetime.utcnow()
+
+    for item in payload.trades:
+        existing = await repo.get_by_ticket(item.ticket)
+        opened_t = item.opened_at or now
+        closed_t = item.closed_at or now
+        net_pl = item.profit + item.commission + item.swap
+
+        if not existing:
+            trade = Trade(
+                account_id=ea.account_id,
+                mt5_ticket=item.ticket,
+                symbol=item.symbol,
+                direction=item.direction,
+                volume=round(item.volume, 4),
+                entry_price=item.entry_price,
+                stop_loss=0.0,
+                take_profit=0.0,
+                current_price=item.exit_price,
+                exit_price=item.exit_price,
+                profit=item.profit,
+                commission=item.commission,
+                swap=item.swap,
+                net_profit=net_pl,
+                status=TradeStatus.CLOSED,
+                opened_at=opened_t,
+                closed_at=closed_t,
+                idempotency_key=f"pos_close_{item.ticket}"
+            )
+            await repo.create(trade)
+            synced_count += 1
+        else:
+            existing.symbol = item.symbol
+            existing.direction = item.direction
+            existing.volume = round(item.volume, 4)
+            existing.entry_price = item.entry_price
+            existing.exit_price = item.exit_price
+            existing.current_price = item.exit_price
+            existing.profit = item.profit
+            existing.commission = item.commission
+            existing.swap = item.swap
+            existing.net_profit = net_pl
+            existing.status = TradeStatus.CLOSED
+            existing.opened_at = opened_t
+            existing.closed_at = closed_t
+            await repo.update(existing)
+            synced_count += 1
+
+    await db.commit()
+
+    if synced_count > 0:
+        from app.events.bus import event_bus
+        await event_bus.emit("POSITION_CLOSED", {
+            "account_id": ea.account_id,
+            "synced_count": synced_count,
+        })
+
+    return {"status": "ok", "synced": synced_count}
 
 @router.get("/config")
 async def get_config(ea: EARegistration = Depends(get_ea_from_api_key)):

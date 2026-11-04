@@ -65,6 +65,7 @@ class TradeClose(BaseModel):
     commission: float = 0.0
     swap: float = 0.0
     closed_at: Optional[Union[datetime, str]] = None
+    opened_at: Optional[Union[datetime, str]] = None
     idempotency_key: str = ""
     close_reason: Optional[str] = None
     ticket: Optional[int] = None
@@ -73,9 +74,30 @@ class TradeClose(BaseModel):
     volume: Optional[float] = None
     entry_price: Optional[float] = None
 
-    @field_validator("closed_at", mode="before")
-    def validate_closed_at(cls, v):
+    @field_validator("closed_at", "opened_at", mode="before")
+    def validate_datetimes(cls, v):
         return parse_mql_datetime(v)
+
+class HistoricalTradeItem(BaseModel):
+    ticket: int
+    symbol: str
+    direction: TradeDirection
+    volume: float
+    entry_price: float
+    exit_price: float
+    profit: float
+    commission: float = 0.0
+    swap: float = 0.0
+    opened_at: Optional[Union[datetime, str]] = None
+    closed_at: Optional[Union[datetime, str]] = None
+    close_reason: Optional[str] = "HISTORICAL"
+
+    @field_validator("opened_at", "closed_at", mode="before")
+    def validate_datetimes(cls, v):
+        return parse_mql_datetime(v)
+
+class HistoricalSyncPayload(BaseModel):
+    trades: list[HistoricalTradeItem]
 
 class TradeResponse(BaseModel):
     id: str

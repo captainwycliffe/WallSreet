@@ -7,22 +7,25 @@
 //+------------------------------------------------------------------+
 #property copyright "MT5 Trade Monitor"
 #property link      "https://github.com/captainwycliffe/WallSreet"
-#property version   "1.43"
+#property version   "1.50"
 #property strict
 
 // ─── Input Parameters ──────────────────────────────────────────────────────────
 input group "=== Backend Connection Settings ==="
-input string   EA_API_KEY        = "mt5ea_demo_key_12345";       // Backend EA API Key
-input string   BACKEND_URL       = "https://mt5-monitor-i6si.onrender.com"; // Backend Server URL (Render cloud)
-input int      HEARTBEAT_SECONDS = 15;                           // Heartbeat Interval (secs)
-input bool     ENABLE_REPORTING  = true;                         // Enable Event Reporting
-input bool     DEBUG_MODE        = true;                         // Show Debug Logs in Experts Tab
+input string   EA_API_KEY           = "mt5ea_demo_key_12345";                  // Backend EA API Key
+input string   BACKEND_URL          = "https://mt5-monitor-i6si.onrender.com"; // Backend Server URL (Render cloud)
+input int      HEARTBEAT_SECONDS    = 15;                                      // Heartbeat Interval (secs)
+input bool     ENABLE_REPORTING     = true;                                    // Enable Event Reporting
+input bool     DEBUG_MODE           = true;                                    // Show Debug Logs in Experts Tab
+
+input group "=== Trade History Sync Settings ==="
+input int      HISTORY_DAYS_TO_SYNC = 90;                                      // Past History Sync Period (Days)
 
 input group "=== Near-Entry Alert Distances ==="
-input double   GOLD_ALERT_USD    = 2.00;                         // Gold (XAUUSD) Alert Distance ($2.00 = 20 pips)
-input double   FX_ALERT_PIPS     = 7.0;                          // Forex Alert Distance (7 pips)
-input double   BTC_ALERT_USD     = 150.0;                        // Bitcoin (BTCUSD) Alert Distance ($150)
-input double   INDEX_ALERT_PTS   = 25.0;                         // Indices (NAS100/US30) Alert Distance (25 pts)
+input double   GOLD_ALERT_USD       = 2.00;                                    // Gold (XAUUSD) Alert Distance ($2.00 = 20 pips)
+input double   FX_ALERT_PIPS        = 7.0;                                     // Forex Alert Distance (7 pips)
+input double   BTC_ALERT_USD        = 150.0;                                   // Bitcoin (BTCUSD) Alert Distance ($150)
+input double   INDEX_ALERT_PTS      = 25.0;                                    // Indices (NAS100/US30) Alert Distance (25 pts)
 
 //+------------------------------------------------------------------+
 //| Core Adapter Implementation                                       |
@@ -40,6 +43,7 @@ private:
    datetime m_last_near_entry_check;
    datetime m_last_alert_time;
    ulong    m_last_alert_ticket;
+   datetime m_last_history_sync;
 
    string BuildAuthHeader()
    {
@@ -177,31 +181,120 @@ private:
       }
    }
 
-   void SyncClosedTradesToday()
+   void SyncClosedTradeHistory(const int days = 90)
    {
-      datetime start_of_day = TimeCurrent() - (TimeCurrent() % 86400); // 00:00:00 today
-      if(HistorySelect(start_of_day, TimeCurrent() + 60))
+      datetime from_date = TimeCurrent() - (days * 86400);
+      if(!HistorySelect(from_date, TimeCurrent() + 60))
       {
-         int total = HistoryDealsTotal();
-         if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing %d closed deals from today...", total);
-         for(int i = 0; i < total; i++)
-         {
-            ulong deal = HistoryDealGetTicket(i);
-            if(deal == 0) continue;
-            ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal, DEAL_ENTRY);
-            if(entry_type == DEAL_ENTRY_OUT || entry_type == DEAL_ENTRY_INOUT)
-            {
-               long close_ticket = (long)HistoryDealGetInteger(deal, DEAL_POSITION_ID);
-               double profit     = HistoryDealGetDouble(deal, DEAL_PROFIT);
-               double commission = HistoryDealGetDouble(deal, DEAL_COMMISSION);
-               double swap       = HistoryDealGetDouble(deal, DEAL_SWAP);
-               double exit_price = HistoryDealGetDouble(deal, DEAL_PRICE);
+         if(m_debug) Print("[MT5Adapter] HistorySelect failed");
+         return;
+      }
 
-               ReportPositionClose(close_ticket, exit_price, profit, commission, swap, "HISTORICAL");
-               Sleep(50);
+      int total = HistoryDealsTotal();
+      if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing closed trade history (%d deals over last %d days)...", total, days);
+
+      string trades_json = "[";
+      int batch_count = 0;
+      int total_synced = 0;
+
+      for(int i = 0; i < total; i++)
+      {
+         ulong deal = HistoryDealGetTicket(i);
+         if(deal == 0) continue;
+
+         ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal, DEAL_ENTRY);
+         if(entry_type != DEAL_ENTRY_OUT && entry_type != DEAL_ENTRY_INOUT) continue;
+
+         long close_ticket = (long)HistoryDealGetInteger(deal, DEAL_POSITION_ID);
+         if(close_ticket <= 0) close_ticket = (long)deal;
+
+         string sym        = HistoryDealGetString(deal, DEAL_SYMBOL);
+         double profit     = HistoryDealGetDouble(deal, DEAL_PROFIT);
+         double commission = HistoryDealGetDouble(deal, DEAL_COMMISSION);
+         double swap       = HistoryDealGetDouble(deal, DEAL_SWAP);
+         double exit_price = HistoryDealGetDouble(deal, DEAL_PRICE);
+         double vol        = HistoryDealGetDouble(deal, DEAL_VOLUME);
+         datetime close_dt = (datetime)HistoryDealGetInteger(deal, DEAL_TIME);
+
+         ENUM_DEAL_TYPE dtype = (ENUM_DEAL_TYPE)HistoryDealGetInteger(deal, DEAL_TYPE);
+         string dir = (dtype == DEAL_TYPE_SELL) ? "BUY" : "SELL";
+
+         double entry_price = exit_price;
+         datetime open_dt   = close_dt;
+
+         if(HistorySelectByPosition(close_ticket))
+         {
+            int pos_deals = HistoryDealsTotal();
+            for(int j = 0; j < pos_deals; j++)
+            {
+               ulong in_deal = HistoryDealGetTicket(j);
+               if(in_deal > 0 && (ENUM_DEAL_ENTRY)HistoryDealGetInteger(in_deal, DEAL_ENTRY) == DEAL_ENTRY_IN)
+               {
+                  entry_price = HistoryDealGetDouble(in_deal, DEAL_PRICE);
+                  open_dt     = (datetime)HistoryDealGetInteger(in_deal, DEAL_TIME);
+                  ENUM_DEAL_TYPE in_dtype = (ENUM_DEAL_TYPE)HistoryDealGetInteger(in_deal, DEAL_TYPE);
+                  if(in_dtype == DEAL_TYPE_BUY) dir = "BUY";
+                  else if(in_dtype == DEAL_TYPE_SELL) dir = "SELL";
+                  break;
+               }
             }
+            HistorySelect(from_date, TimeCurrent() + 60);
+         }
+
+         string item_json = StringFormat(
+            "{"
+            "\"ticket\":%lld,"
+            "\"symbol\":\"%s\","
+            "\"direction\":\"%s\","
+            "\"volume\":%.4f,"
+            "\"entry_price\":%.5f,"
+            "\"exit_price\":%.5f,"
+            "\"profit\":%.2f,"
+            "\"commission\":%.2f,"
+            "\"swap\":%.2f,"
+            "\"opened_at\":\"%s\","
+            "\"closed_at\":\"%s\","
+            "\"close_reason\":\"HISTORICAL\""
+            "}",
+            close_ticket,
+            JsonEscape(sym),
+            dir,
+            vol,
+            entry_price,
+            exit_price,
+            profit,
+            commission,
+            swap,
+            TimeToString(open_dt, TIME_DATE|TIME_MINUTES|TIME_SECONDS),
+            TimeToString(close_dt, TIME_DATE|TIME_MINUTES|TIME_SECONDS)
+         );
+
+         if(batch_count > 0) trades_json += ",";
+         trades_json += item_json;
+         batch_count++;
+         total_synced++;
+
+         if(batch_count >= 50)
+         {
+            trades_json += "]";
+            string post_data = "{\"trades\":" + trades_json + "}";
+            string resp;
+            SendHTTPPost("/api/mt5/history/sync", post_data, resp);
+            trades_json = "[";
+            batch_count = 0;
+            Sleep(80);
          }
       }
+
+      if(batch_count > 0)
+      {
+         trades_json += "]";
+         string post_data = "{\"trades\":" + trades_json + "}";
+         string resp;
+         SendHTTPPost("/api/mt5/history/sync", post_data, resp);
+      }
+
+      if(m_debug && total_synced > 0) PrintFormat("[MT5Adapter] Trade history sync completed (%d trades processed).", total_synced);
    }
 
    void SyncExistingPositions()
@@ -303,6 +396,7 @@ public:
       m_last_near_entry_check = 0;
       m_last_alert_time      = 0;
       m_last_alert_ticket    = 0;
+      m_last_history_sync    = 0;
    }
 
    bool Initialize()
@@ -312,7 +406,8 @@ public:
       m_last_heartbeat = TimeCurrent();
       SyncExistingPositions();
       SyncPendingOrders();
-      SyncClosedTradesToday();
+      SyncClosedTradeHistory(HISTORY_DAYS_TO_SYNC);
+      m_last_history_sync = TimeCurrent();
       Print("[MT5Adapter] Adapter connected to: " + m_backend_url);
       return true;
    }
@@ -380,6 +475,11 @@ public:
          SendHeartbeatInternal();
          SyncPendingOrders();
          m_last_heartbeat = now;
+      }
+      if(now - m_last_history_sync >= 300)
+      {
+         SyncClosedTradeHistory(HISTORY_DAYS_TO_SYNC);
+         m_last_history_sync = now;
       }
       CheckPositionUpdates();
       CheckPriceNearEntry();
@@ -497,35 +597,57 @@ public:
    }
 
    bool ReportPositionClose(
-      const long   ticket,
-      const double exit_price,
-      const double profit,
-      const double commission  = 0,
-      const double swap        = 0,
-      const string close_reason = ""
+      const long     ticket,
+      const double   exit_price,
+      const double   profit,
+      const double   commission   = 0,
+      const double   swap         = 0,
+      const string   close_reason = "",
+      const string   symbol       = "",
+      const string   direction    = "",
+      const double   volume       = 0,
+      const datetime closed_at    = 0,
+      const datetime opened_at    = 0,
+      const double   entry_price  = 0
    )
    {
+      datetime close_t = (closed_at > 0) ? closed_at : TimeCurrent();
+      datetime open_t  = (opened_at > 0) ? opened_at : close_t;
+
       string json = StringFormat(
          "{"
          "\"idempotency_key\":\"pos_close_%lld\","
          "\"ticket\":%lld,"
+         "\"symbol\":\"%s\","
+         "\"direction\":\"%s\","
+         "\"volume\":%.4f,"
+         "\"entry_price\":%.5f,"
          "\"exit_price\":%.5f,"
          "\"profit\":%.2f,"
          "\"commission\":%.2f,"
          "\"swap\":%.2f,"
+         "\"opened_at\":\"%s\","
          "\"closed_at\":\"%s\","
          "\"close_reason\":\"%s\""
          "}",
          ticket, ticket,
-         exit_price, profit, commission, swap,
-         TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS),
+         JsonEscape(symbol),
+         direction,
+         volume,
+         entry_price,
+         exit_price,
+         profit,
+         commission,
+         swap,
+         TimeToString(open_t, TIME_DATE|TIME_MINUTES|TIME_SECONDS),
+         TimeToString(close_t, TIME_DATE|TIME_MINUTES|TIME_SECONDS),
          JsonEscape(close_reason)
       );
 
       string response;
       if(SendHTTPPost("/api/mt5/position/close?ticket=" + IntegerToString(ticket), json, response))
       {
-         if(m_debug) PrintFormat("[MT5Adapter] Position Close Reported: Ticket:%lld P/L:%.2f", ticket, profit);
+         if(m_debug) PrintFormat("[MT5Adapter] Position Close Reported: %s %s Ticket:%lld P/L:%.2f", symbol, direction, ticket, profit);
          return true;
       }
       return false;
@@ -564,16 +686,42 @@ public:
             {
                long close_ticket = (long)HistoryDealGetInteger(trans.deal, DEAL_POSITION_ID);
                if(close_ticket <= 0) close_ticket = (long)trans.position;
+               string sym        = HistoryDealGetString(trans.deal, DEAL_SYMBOL);
                double profit     = HistoryDealGetDouble(trans.deal, DEAL_PROFIT);
                double commission = HistoryDealGetDouble(trans.deal, DEAL_COMMISSION);
                double swap       = HistoryDealGetDouble(trans.deal, DEAL_SWAP);
                double exit_price = HistoryDealGetDouble(trans.deal, DEAL_PRICE);
+               double vol        = HistoryDealGetDouble(trans.deal, DEAL_VOLUME);
+               datetime close_dt = (datetime)HistoryDealGetInteger(trans.deal, DEAL_TIME);
 
                string reason = "MANUAL";
                if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_SL)) < 0.0001) reason = "SL_HIT";
                if(MathAbs(exit_price - HistoryDealGetDouble(trans.deal, DEAL_TP)) < 0.0001) reason = "TP_HIT";
 
-               ReportPositionClose(close_ticket, exit_price, profit, commission, swap, reason);
+               ENUM_DEAL_TYPE dtype = (ENUM_DEAL_TYPE)HistoryDealGetInteger(trans.deal, DEAL_TYPE);
+               string dir = (dtype == DEAL_TYPE_SELL) ? "BUY" : "SELL";
+
+               double entry_price = exit_price;
+               datetime open_dt   = close_dt;
+               if(HistorySelectByPosition(close_ticket))
+               {
+                  int pos_deals = HistoryDealsTotal();
+                  for(int j = 0; j < pos_deals; j++)
+                  {
+                     ulong in_deal = HistoryDealGetTicket(j);
+                     if(in_deal > 0 && (ENUM_DEAL_ENTRY)HistoryDealGetInteger(in_deal, DEAL_ENTRY) == DEAL_ENTRY_IN)
+                     {
+                        entry_price = HistoryDealGetDouble(in_deal, DEAL_PRICE);
+                        open_dt     = (datetime)HistoryDealGetInteger(in_deal, DEAL_TIME);
+                        ENUM_DEAL_TYPE in_dtype = (ENUM_DEAL_TYPE)HistoryDealGetInteger(in_deal, DEAL_TYPE);
+                        if(in_dtype == DEAL_TYPE_BUY) dir = "BUY";
+                        else if(in_dtype == DEAL_TYPE_SELL) dir = "SELL";
+                        break;
+                     }
+                  }
+               }
+
+               ReportPositionClose(close_ticket, exit_price, profit, commission, swap, reason, sym, dir, vol, close_dt, open_dt, entry_price);
             }
          }
       }
