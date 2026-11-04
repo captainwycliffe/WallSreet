@@ -181,6 +181,30 @@ private:
       }
    }
 
+   void FlushHistoryBatch(const long &tickets[], const string &jsons[], int count)
+   {
+      if(count <= 0) return;
+      string trades_json = "[";
+      for(int i = 0; i < count; i++)
+      {
+         if(i > 0) trades_json += ",";
+         trades_json += jsons[i];
+      }
+      trades_json += "]";
+      string post_data = "{\"trades\":" + trades_json + "}";
+      string resp;
+      bool ok = SendHTTPPost("/api/mt5/history/sync", post_data, resp);
+      if(!ok)
+      {
+         if(m_debug) PrintFormat("[MT5Adapter] Batch sync endpoint not available, falling back to individual sync (%d trades)...", count);
+         for(int i = 0; i < count; i++)
+         {
+            SendHTTPPost("/api/mt5/position/close?ticket=" + IntegerToString(tickets[i]), jsons[i], resp);
+            Sleep(30);
+         }
+      }
+   }
+
    void SyncClosedTradeHistory(const int days = 90)
    {
       datetime from_date = TimeCurrent() - (days * 86400);
@@ -193,7 +217,8 @@ private:
       int total = HistoryDealsTotal();
       if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing closed trade history (%d deals over last %d days)...", total, days);
 
-      string trades_json = "[";
+      long batch_tickets[50];
+      string batch_jsons[50];
       int batch_count = 0;
       int total_synced = 0;
 
@@ -269,18 +294,14 @@ private:
             TimeToString(close_dt, TIME_DATE|TIME_MINUTES|TIME_SECONDS)
          );
 
-         if(batch_count > 0) trades_json += ",";
-         trades_json += item_json;
+         batch_tickets[batch_count] = close_ticket;
+         batch_jsons[batch_count]   = item_json;
          batch_count++;
          total_synced++;
 
          if(batch_count >= 50)
          {
-            trades_json += "]";
-            string post_data = "{\"trades\":" + trades_json + "}";
-            string resp;
-            SendHTTPPost("/api/mt5/history/sync", post_data, resp);
-            trades_json = "[";
+            FlushHistoryBatch(batch_tickets, batch_jsons, batch_count);
             batch_count = 0;
             Sleep(80);
          }
@@ -288,10 +309,8 @@ private:
 
       if(batch_count > 0)
       {
-         trades_json += "]";
-         string post_data = "{\"trades\":" + trades_json + "}";
-         string resp;
-         SendHTTPPost("/api/mt5/history/sync", post_data, resp);
+         FlushHistoryBatch(batch_tickets, batch_jsons, batch_count);
+         batch_count = 0;
       }
 
       if(m_debug && total_synced > 0) PrintFormat("[MT5Adapter] Trade history sync completed (%d trades processed).", total_synced);

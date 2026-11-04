@@ -218,21 +218,26 @@ async def update_position(
 
 @router.post("/position/close")
 async def close_position(
-    ticket: int,
     req: TradeClose,
+    ticket: Optional[int] = None,
     ea: EARegistration = Depends(get_ea_from_api_key),
     db: AsyncSession = Depends(get_db),
 ):
+    ticket_val = ticket if ticket is not None else req.ticket
+    if not ticket_val:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="ticket is required in query or body")
+
     from app.repositories.trade_repo import TradeRepository
     repo = TradeRepository(db)
-    trade = await repo.get_by_ticket(ticket)
+    trade = await repo.get_by_ticket(ticket_val)
     closed_time = req.closed_at or datetime.utcnow()
     opened_time = req.opened_at or closed_time
 
     if not trade:
         trade = Trade(
             account_id=ea.account_id,
-            mt5_ticket=ticket,
+            mt5_ticket=ticket_val,
             symbol=req.symbol or "MT5_TRADE",
             direction=req.direction or TradeDirection.BUY,
             volume=round(req.volume or 0.01, 4),
@@ -297,13 +302,13 @@ async def close_position(
                 exit_str = f"{exit_f:.2f}" if exit_f > 100 else f"{exit_f:.5f}"
                 lots_str = f"{round(float(trade.volume or 0.01), 4):g}"
                 title = f"💰 Trade Closed ({p_sign}${trade.net_profit:.2f})"
-                body = f"{trade.symbol} {lots_str} lots (#{ticket}) closed at {exit_str} (P/L: {p_sign}${trade.net_profit:.2f})"
+                body = f"{trade.symbol} {lots_str} lots (#{ticket_val}) closed at {exit_str} (P/L: {p_sign}${trade.net_profit:.2f})"
                 await notif_service.send_to_user(
                     user_id=acc.user_id,
                     notif_type="TRADE_CLOSED",
                     title=title,
                     body=body,
-                    data={"ticket": ticket, "symbol": trade.symbol, "net_profit": trade.net_profit}
+                    data={"ticket": ticket_val, "symbol": trade.symbol, "net_profit": trade.net_profit}
                 )
         except Exception as e:
             logger.warning("Failed to send trade closed notification: %s", e)
