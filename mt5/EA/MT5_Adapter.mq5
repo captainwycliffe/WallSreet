@@ -50,7 +50,7 @@ private:
       return "X-API-Key: " + m_api_key;
    }
 
-   bool SendHTTPPost(const string endpoint, const string json_body, string &response)
+   bool SendHTTPPost(const string endpoint, const string json_body, string &response, const bool silent=false)
    {
       string url     = m_backend_url + endpoint;
       string headers = "Content-Type: application/json\r\n" + BuildAuthHeader() + "\r\n";
@@ -70,7 +70,7 @@ private:
          }
          return false;
       }
-      if(m_debug) PrintFormat("[MT5Adapter] POST %s -> %d", endpoint, res);
+      if(m_debug && !silent) PrintFormat("[MT5Adapter] POST %s -> %d", endpoint, res);
       if(res == 1001)
       {
          PrintFormat("[MT5Adapter] Error 1001 (No Connection to %s). Check if backend is running on port 8080 or use http://127.0.0.1:8080", m_backend_url);
@@ -135,13 +135,9 @@ private:
       );
 
       string response;
-      if(!SendHTTPPost("/api/mt5/heartbeat", json, response))
+      if(!SendHTTPPost("/api/mt5/heartbeat", json, response, true))
       {
          if(m_debug) Print("[MT5Adapter] Heartbeat failed. Ensure server is running & URL is in WebRequest whitelist.");
-      }
-      else
-      {
-         if(m_debug) Print("[MT5Adapter] Heartbeat OK (ONLINE)");
       }
    }
 
@@ -157,17 +153,10 @@ private:
          ulong ticket = PositionGetTicket(i);
          if(ticket == 0 || !PositionSelectByTicket(ticket)) continue;
 
-         string dir = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? "BUY" : "SELL";
-         string sym = PositionGetString(POSITION_SYMBOL);
-         double vol = PositionGetDouble(POSITION_VOLUME);
-         double opn = PositionGetDouble(POSITION_PRICE_OPEN);
          double current = PositionGetDouble(POSITION_PRICE_CURRENT);
          double profit  = PositionGetDouble(POSITION_PROFIT);
          double sl      = PositionGetDouble(POSITION_SL);
          double tp      = PositionGetDouble(POSITION_TP);
-
-         // Ensure the open position is registered in backend
-         ReportPositionOpen((long)ticket, "", sym, dir, vol, opn, sl, tp);
 
          string json = StringFormat(
             "{\"ticket\":%llu,\"current_price\":%.5f,\"profit\":%.2f,\"unrealized_profit\":%.2f,\"stop_loss\":%.5f,\"take_profit\":%.5f,\"timestamp\":\"%s\"}",
@@ -176,8 +165,8 @@ private:
          );
 
          string response;
-         SendHTTPPost("/api/mt5/position/update?ticket=" + IntegerToString(ticket), json, response);
-         Sleep(100);
+         SendHTTPPost("/api/mt5/position/update?ticket=" + IntegerToString(ticket), json, response, true);
+         Sleep(40);
       }
    }
 
@@ -193,14 +182,19 @@ private:
       trades_json += "]";
       string post_data = "{\"trades\":" + trades_json + "}";
       string resp;
-      bool ok = SendHTTPPost("/api/mt5/history/sync", post_data, resp);
+      bool ok = SendHTTPPost("/api/mt5/history/sync", post_data, resp, true);
       if(!ok)
       {
-         if(m_debug) PrintFormat("[MT5Adapter] Batch sync endpoint not available, falling back to individual sync (%d trades)...", count);
          for(int i = 0; i < count; i++)
          {
-            SendHTTPPost("/api/mt5/position/close?ticket=" + IntegerToString(tickets[i]), jsons[i], resp);
-            Sleep(30);
+            SendHTTPPost("/api/mt5/position/close?ticket=" + IntegerToString(tickets[i]), jsons[i], resp, true);
+            // Maintain continuous heartbeats so the EA never appears offline to backend
+            if(TimeCurrent() - m_last_heartbeat >= m_heartbeat_secs)
+            {
+               SendHeartbeatInternal();
+               m_last_heartbeat = TimeCurrent();
+            }
+            Sleep(25);
          }
       }
    }
@@ -224,6 +218,13 @@ private:
 
       for(int i = 0; i < total; i++)
       {
+         // Keep heartbeats alive continuously so backend offline monitor never trips
+         if(TimeCurrent() - m_last_heartbeat >= m_heartbeat_secs)
+         {
+            SendHeartbeatInternal();
+            m_last_heartbeat = TimeCurrent();
+         }
+
          ulong deal = HistoryDealGetTicket(i);
          if(deal == 0) continue;
 
@@ -495,9 +496,10 @@ public:
          SyncPendingOrders();
          m_last_heartbeat = now;
       }
-      if(now - m_last_history_sync >= 300)
+      // Incremental catch-up for past 24h only, run every 30 minutes
+      if(now - m_last_history_sync >= 1800)
       {
-         SyncClosedTradeHistory(HISTORY_DAYS_TO_SYNC);
+         SyncClosedTradeHistory(1);
          m_last_history_sync = now;
       }
       CheckPositionUpdates();
