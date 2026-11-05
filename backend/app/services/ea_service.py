@@ -98,8 +98,8 @@ class EAService:
             await notif_service.send_to_user(
                 user_id=account.user_id,
                 notif_type="EA_OFFLINE",
-                title="EA went offline",
-                body=f"{ea.name} on {account.name} stopped sending heartbeats.",
+                title="⚠️ EA Offline Alert",
+                body=f"{ea.name} ({account.name}) stopped sending heartbeats. Check your MT5 terminal / VPS.",
                 data={"ea_id": str(ea.id), "account_id": str(account.id)},
             )
         except Exception:

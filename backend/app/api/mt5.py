@@ -37,6 +37,7 @@ async def heartbeat(
     db: AsyncSession = Depends(get_db)
 ):
     now = datetime.utcnow()
+    was_offline = (ea.status == EARegistrationStatus.OFFLINE)
 
     await db.execute(
         update(EARegistration)
@@ -52,6 +53,19 @@ async def heartbeat(
     res = await db.execute(select(MT5Account).where(MT5Account.id == ea.account_id))
     acc = res.scalar_one_or_none()
     if acc:
+        if was_offline:
+            try:
+                notif_svc = NotificationService(db)
+                await notif_svc.send_to_user(
+                    user_id=acc.user_id,
+                    notif_type="EA_ONLINE",
+                    title="🟢 EA Reconnected",
+                    body=f"{ea.name} ({acc.name}) is back online.",
+                    data={"ea_id": str(ea.id), "account_id": str(acc.id)},
+                )
+            except Exception as e:
+                logger.debug("Failed to send EA_ONLINE notification: %s", e)
+
         if payload.balance is not None and payload.balance > 0: acc.balance = payload.balance
         if payload.equity is not None and payload.equity > 0: acc.equity = payload.equity
         if payload.margin is not None: acc.margin = payload.margin

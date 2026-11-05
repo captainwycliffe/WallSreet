@@ -209,7 +209,15 @@ private:
       }
 
       int total = HistoryDealsTotal();
+      if(total <= 0) return;
       if(m_debug && total > 0) PrintFormat("[MT5Adapter] Syncing closed trade history (%d deals over last %d days)...", total, days);
+
+      ulong deal_tickets[];
+      ArrayResize(deal_tickets, total);
+      for(int i = 0; i < total; i++)
+      {
+         deal_tickets[i] = HistoryDealGetTicket(i);
+      }
 
       long batch_tickets[50];
       string batch_jsons[50];
@@ -225,7 +233,7 @@ private:
             m_last_heartbeat = TimeCurrent();
          }
 
-         ulong deal = HistoryDealGetTicket(i);
+         ulong deal = deal_tickets[i];
          if(deal == 0) continue;
 
          ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal, DEAL_ENTRY);
@@ -248,23 +256,21 @@ private:
          double entry_price = exit_price;
          datetime open_dt   = close_dt;
 
-         if(HistorySelectByPosition(close_ticket))
+         // Search memory array for entry deal without calling HistorySelect in loop
+         for(int j = 0; j < total; j++)
          {
-            int pos_deals = HistoryDealsTotal();
-            for(int j = 0; j < pos_deals; j++)
+            ulong in_deal = deal_tickets[j];
+            if(in_deal > 0 &&
+               (long)HistoryDealGetInteger(in_deal, DEAL_POSITION_ID) == close_ticket &&
+               (ENUM_DEAL_ENTRY)HistoryDealGetInteger(in_deal, DEAL_ENTRY) == DEAL_ENTRY_IN)
             {
-               ulong in_deal = HistoryDealGetTicket(j);
-               if(in_deal > 0 && (ENUM_DEAL_ENTRY)HistoryDealGetInteger(in_deal, DEAL_ENTRY) == DEAL_ENTRY_IN)
-               {
-                  entry_price = HistoryDealGetDouble(in_deal, DEAL_PRICE);
-                  open_dt     = (datetime)HistoryDealGetInteger(in_deal, DEAL_TIME);
-                  ENUM_DEAL_TYPE in_dtype = (ENUM_DEAL_TYPE)HistoryDealGetInteger(in_deal, DEAL_TYPE);
-                  if(in_dtype == DEAL_TYPE_BUY) dir = "BUY";
-                  else if(in_dtype == DEAL_TYPE_SELL) dir = "SELL";
-                  break;
-               }
+               entry_price = HistoryDealGetDouble(in_deal, DEAL_PRICE);
+               open_dt     = (datetime)HistoryDealGetInteger(in_deal, DEAL_TIME);
+               ENUM_DEAL_TYPE in_dtype = (ENUM_DEAL_TYPE)HistoryDealGetInteger(in_deal, DEAL_TYPE);
+               if(in_dtype == DEAL_TYPE_BUY) dir = "BUY";
+               else if(in_dtype == DEAL_TYPE_SELL) dir = "SELL";
+               break;
             }
-            HistorySelect(from_date, TimeCurrent() + 60);
          }
 
          string item_json = StringFormat(
@@ -304,7 +310,7 @@ private:
          {
             FlushHistoryBatch(batch_tickets, batch_jsons, batch_count);
             batch_count = 0;
-            Sleep(80);
+            Sleep(50);
          }
       }
 
@@ -496,10 +502,10 @@ public:
          SyncPendingOrders();
          m_last_heartbeat = now;
       }
-      // Incremental catch-up for past 24h only, run every 30 minutes
-      if(now - m_last_history_sync >= 1800)
+      // Incremental catch-up for past 7 days (catches trades closed while laptop was off), run every 15 minutes
+      if(now - m_last_history_sync >= 900)
       {
-         SyncClosedTradeHistory(1);
+         SyncClosedTradeHistory(7);
          m_last_history_sync = now;
       }
       CheckPositionUpdates();
