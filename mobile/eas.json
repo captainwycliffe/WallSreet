@@ -19,6 +19,16 @@
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
+    "preview-arm64": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a"
+      },
+      "env": {
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      }
+    },
     "production": {
       "env": {
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
