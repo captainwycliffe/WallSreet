@@ -1,0 +1,10 @@
+# EAS Build ignore file
+# EAS uses this instead of .gitignore when uploading the project
+
+node_modules/
+.expo/
+.git/
+dist/
+web-build/
+
+# Do NOT ignore google-services.json here so EAS can bundle it for Android builds
