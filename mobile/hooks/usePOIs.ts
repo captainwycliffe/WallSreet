@@ -11,6 +11,8 @@ export function usePOIs(filters?: Record<string, any>) {
         return { items: [], total: 0, page: 1, pages: 1 };
       }
     },
+    refetchInterval: 5000,
+    staleTime: 2500,
   });
 }
 
@@ -24,5 +26,7 @@ export function usePOI(id: string) {
         return null;
       }
     },
+    refetchInterval: 5000,
+    staleTime: 2500,
   });
 }

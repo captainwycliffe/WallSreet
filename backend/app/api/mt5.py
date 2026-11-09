@@ -114,6 +114,22 @@ async def heartbeat(
                     p.closed_at = t_now
 
     await db.commit()
+
+    if acc:
+        try:
+            from app.websocket.events import publish_account_event
+            await publish_account_event(str(ea.account_id), {
+                "account_id": str(ea.account_id),
+                "balance": float(acc.balance or 0.0),
+                "equity": float(acc.equity or 0.0),
+                "open_pl": float(acc.open_pl or 0.0),
+                "margin": float(acc.margin or 0.0),
+                "free_margin": float(acc.free_margin or 0.0),
+                "daily_pl": float(acc.daily_pl or 0.0),
+            })
+        except Exception as e:
+            logger.debug("Failed to publish account event from heartbeat: %s", e)
+
     return {"status": "ok"}
 
 @router.post("/poi", response_model=POIResponse)
@@ -228,6 +244,22 @@ async def update_position(
         if profit_val is not None: trade.profit = profit_val
         await repo.update(trade)
     await db.commit()
+
+    try:
+        from app.websocket.events import publish_trade_event
+        await publish_trade_event(str(ea.account_id), "POSITION_UPDATED", {
+            "account_id": str(ea.account_id),
+            "trade_id": str(trade.id),
+            "ticket": trade.mt5_ticket,
+            "current_price": float(trade.current_price or 0.0),
+            "profit": float(trade.profit or 0.0),
+            "stop_loss": float(trade.stop_loss or 0.0),
+            "take_profit": float(trade.take_profit or 0.0),
+            "status": trade.status.value if hasattr(trade.status, 'value') else str(trade.status),
+        })
+    except Exception as e:
+        logger.debug("Failed to publish trade update event: %s", e)
+
     return {"status": "updated"}
 
 @router.post("/position/close")
@@ -297,10 +329,10 @@ async def close_position(
     # Emit event bus & WS notification
     from app.events.bus import event_bus
     await event_bus.emit("POSITION_CLOSED", {
-        "account_id": ea.account_id,
-        "trade_id": trade.id,
-        "ticket": ticket,
-        "net_profit": trade.net_profit,
+        "account_id": str(ea.account_id),
+        "trade_id": str(trade.id),
+        "ticket": ticket_val,
+        "net_profit": float(trade.net_profit or 0.0),
     })
 
     # Only send live push notifications for real-time close events, not historical backfills
@@ -392,7 +424,7 @@ async def sync_history(
     if synced_count > 0:
         from app.events.bus import event_bus
         await event_bus.emit("POSITION_CLOSED", {
-            "account_id": ea.account_id,
+            "account_id": str(ea.account_id),
             "synced_count": synced_count,
         })
 

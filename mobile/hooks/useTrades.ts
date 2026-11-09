@@ -11,6 +11,8 @@ export function useTrades(filters?: Record<string, any>) {
         return { items: [], total: 0, page: 1, pages: 1 };
       }
     },
+    refetchInterval: 4000,
+    staleTime: 2000,
   });
 }
 
@@ -24,5 +26,7 @@ export function useTrade(id: string) {
         return null;
       }
     },
+    refetchInterval: 4000,
+    staleTime: 2000,
   });
 }

@@ -61,7 +61,6 @@ class ConnectionManager:
                 "Real-time delivery active.", e
             )
 
-
     async def shutdown(self):
         """Stop Redis listener. Call on application shutdown."""
         if self._pubsub_task:
@@ -133,19 +132,9 @@ class ConnectionManager:
 
     async def publish_to_account(self, account_id: str, message: WSMessage):
         """
-        Publish a message to all users of an account via Redis.
-        Works across multiple backend workers.
         Publish a message to all users of an account.
         Uses Redis when available; falls back to direct in-process delivery.
         """
-        if not self._redis:
-            return
-        channel = f"{ACCOUNT_CHANNEL_PREFIX}{account_id}"
-        payload = message.model_dump_json()
-        try:
-            await self._redis.publish(channel, payload)
-        except Exception as e:
-            logger.error("Redis publish error for account %s: %s", account_id, e)
         if self._redis:
             channel = f"{ACCOUNT_CHANNEL_PREFIX}{account_id}"
             try:
@@ -157,15 +146,6 @@ class ConnectionManager:
         await self._forward_to_account_users(account_id, message)
 
     async def publish_to_user(self, user_id: str, message: WSMessage):
-        """Publish a message to a specific user via Redis."""
-        if not self._redis:
-            return
-        channel = f"{USER_CHANNEL_PREFIX}{user_id}"
-        payload = message.model_dump_json()
-        try:
-            await self._redis.publish(channel, payload)
-        except Exception as e:
-            logger.error("Redis publish error for user %s: %s", user_id, e)
         """
         Publish a message to a specific user.
         Uses Redis when available; falls back to direct in-process delivery.

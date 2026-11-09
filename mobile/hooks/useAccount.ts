@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { accountsService } from '../services/api';
 import { useAccountStore } from '../store/accountStore';
-import { useEffect } from 'react';
+
 export function useAccounts() {
   const setAccounts = useAccountStore(s => s.setAccounts);
   
@@ -16,6 +16,8 @@ export function useAccounts() {
         return [];
       }
     },
+    refetchInterval: 4000,
+    staleTime: 2000,
   });
 }
 
